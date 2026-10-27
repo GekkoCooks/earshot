@@ -4,6 +4,10 @@ Attendance that needs you in the room. The lecturer's laptop plays a short code 
 
 ![The lecturer's live session: attendance count, the code being played and the join QR across the top, the register filling in below](docs/screenshots/lecturer-live.png)
 
+[![Demo: the lecturer's laptop on the left plays the code, an iPhone on the right listens and turns blue with Present while its name inks into the register](docs/demo-poster.jpg)](docs/demo.mp4)
+
+**[Watch the 27 second demo](docs/demo.mp4).** A real check-in over the public tunnel: the laptop runs a live session, an iPhone opens the class link, enters a roll number, listens for a few seconds, and is marked present while its row inks into the register.
+
 ## The problem
 
 In many Indian colleges attendance decides whether you can sit the exam, so it gets gamed. Friends sign for each other. A QR code on the projector gets photographed and lands in the class WhatsApp group within seconds. Roll call is the reliable option, and it costs 5 to 10 minutes of every lecture.
@@ -91,7 +95,7 @@ Browsers only give pages the microphone over **https**. On `localhost` that is a
 | | Expected | Notes |
 | --- | --- | --- |
 | Chrome on Android | Yes | AudioWorklet, and voice processing can be turned off. |
-| Safari on iPhone (14.5+) | Yes | The page starts audio inside the tap, as iOS requires. |
+| Safari on iPhone (14.5+) | Yes, checked on a real iPhone | The page starts audio inside the tap, as iOS requires. |
 | Laptop speakers | Quiet band at short to medium range | Many laptop speakers roll off above 18 kHz. Audible mode and the room's speakers extend range. |
 | Back of a large lecture hall | Use audible mode or the room PA | The field test page (`/lab`) shows what each seat hears. |
 
@@ -175,7 +179,7 @@ test/               node:test suites and the simulated room
 
 ## Known limitations
 
-- **Tested across two laptops, not yet on physical phones or in a real lecture hall.** Beyond a two-laptop check-in over the public tunnel, everything above is from unit tests, the simulated room, and real Chrome fed with recorded audio. The first real-room session should start with the field test page.
+- **Tested on two laptops and an iPhone, not yet on Android or in a real lecture hall.** Real check-ins work laptop to laptop and laptop to iPhone over the public tunnel (see the demo). Range, noise and Android microphones are so far covered only by the simulated room and real Chrome fed with recorded audio. The first real-room session should start with the field test page.
 - **Some people can hear 18 kHz,** especially younger listeners, as a faint high hiss. The default volume is moderate and audible mode exists for when the quiet band is a problem either way.
 - **Some phones and laptops filter high frequencies.** Cheap laptop speakers often fall off above 18 kHz, and a few Android microphones roll off above 16 kHz. Audible mode covers both.
 - **iOS may apply its own audio processing** whatever the page asks for. If that removes the quiet band on some iPhones, audible mode is the fallback.
