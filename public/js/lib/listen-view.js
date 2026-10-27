@@ -42,9 +42,12 @@ export class Waterfall {
     const rows = spectrum.length;
     const rowH = h / rows;
     ctx.fillStyle = this.color;
+    // Draw each bin against this column's median, so background noise fades
+    // out and only tones that stand above it show.
+    const dbs = Array.from(spectrum, (v) => 10 * Math.log10(v || 1));
+    const median = [...dbs].sort((a, b) => a - b)[rows >> 1];
     for (let i = 0; i < rows; i++) {
-      const db = 10 * Math.log10(spectrum[i] || 1);
-      const a = Math.max(0, Math.min(1, (db - 4) / 16));
+      const a = Math.max(0, Math.min(1, (dbs[i] - median - 5) / 12));
       if (a < 0.04) continue;
       ctx.globalAlpha = a;
       // Low tones at the bottom, like a musical staff.

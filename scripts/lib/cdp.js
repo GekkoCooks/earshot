@@ -22,12 +22,14 @@ export function findChrome() {
   return bin;
 }
 
-export async function launch({ args = [], port = 9300 + Math.floor(Math.random() * 500) } = {}) {
+// headed: headless Chrome's fake microphone delivers silence, so audio tests
+// run a normal window parked off-screen instead.
+export async function launch({ args = [], headed = !!process.env.HEADED, port = 9300 + Math.floor(Math.random() * 500) } = {}) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'earshot-chrome-'));
   const proc = spawn(
     findChrome(),
     [
-      '--headless=new',
+      ...(headed ? ['--window-position=-3000,-3000', '--window-size=420,900'] : ['--headless=new']),
       `--remote-debugging-port=${port}`,
       `--user-data-dir=${profile}`,
       '--no-first-run',

@@ -239,7 +239,10 @@ const L = {
   tickTimer: null,
   levelDb: 0,
   lostCount: 0,
+  // Counters for the end-to-end test and the field test page.
+  stats: { levels: 0, syncs: 0, frames: 0, lost: 0, maxDb: 0, submitted: [], replies: [] },
 };
+window.__earshot = L.stats;
 
 function setText(title, body, label) {
   const t = $('#title');
@@ -304,11 +307,14 @@ async function startListening() {
       onLevel(levels) {
         const db = Math.max(levels[band()], levels.quiet);
         L.levelDb = db;
+        L.stats.levels++;
+        L.stats.maxDb = Math.max(L.stats.maxDb, db);
         L.wf?.push(S.receiver?.demod.spectrum(levels.audible > levels.quiet + 6 ? 'audible' : band()));
         updateMeter(db);
         if (db > 9) L.lastHeard = Date.now();
       },
       onSync() {
+        L.stats.syncs++;
         clearSlots($('#stage'));
         setPhase('locked');
       },
@@ -317,9 +323,11 @@ async function startListening() {
       },
       onLost() {
         L.lostCount++;
+        L.stats.lost++;
         setPhase('close');
       },
       onFrame(frame) {
+        L.stats.frames++;
         submit(frame);
       },
     });
@@ -415,6 +423,7 @@ async function submit(frame) {
     if (title) setText(title, text, 'Listening');
   };
 
+  L.stats.replies.push(res ? res.status + ' ' + (data?.error || data?.status) : 'offline');
   if (!res) return resume('Still offline', 'Check your Wi-Fi or mobile data. Your phone keeps listening and will try again with the next code.');
 
   if (res.ok) {
@@ -458,10 +467,12 @@ async function submit(frame) {
 async function onIdentify(e) {
   e.preventDefault();
   const form = e.currentTarget;
-  const roll = form.roll.value.trim().toUpperCase();
-  const name = form.name?.value.trim();
+  // form.name is the form's own name attribute, so go through elements.
+  const nameInput = form.elements.namedItem('name');
+  const roll = form.elements.namedItem('roll').value.trim().toUpperCase();
+  const name = nameInput?.value.trim();
   if (!roll) return views.identify('Enter your roll number.');
-  if (form.name && !name) return views.identify('Enter your name.');
+  if (nameInput && !name) return views.identify('Enter your name.');
   form.querySelector('button').disabled = true;
   const n = nonce();
   const sig = await S.identity.sign(`earshot-enrol\n${code}\n${roll}\n${n}`);
