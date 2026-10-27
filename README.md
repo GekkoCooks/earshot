@@ -4,9 +4,6 @@ Attendance that needs you in the room. The lecturer's laptop plays a short code 
 
 ![The lecturer's live session: the code being played on the left, the register filling in on the right](docs/screenshots/lecturer-live.png)
 
-<!-- Demo GIF: record a phone checking in during a real lecture and save it as docs/demo.gif -->
-> **Demo GIF placeholder.** Add a 10 second recording of a phone checking in here (`docs/demo.gif`).
-
 ## The problem
 
 In many Indian colleges attendance decides whether you can sit the exam, so it gets gamed. Friends sign for each other. A QR code on the projector gets photographed and lands in the class WhatsApp group within seconds. Roll call is the reliable option, and it costs 5 to 10 minutes of every lecture.
