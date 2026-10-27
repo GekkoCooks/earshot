@@ -103,7 +103,7 @@ Browsers only give pages the microphone over **https**. On `localhost` that is a
 Needs Node 22.13 or newer. There are no dependencies to install.
 
 ```sh
-git clone <this repo> earshot && cd earshot
+git clone https://github.com/GekkoCooks/earshot.git && cd earshot
 npm run seed       # optional: three demo classes with past sessions
 npm run cert       # optional: https for phones on the same Wi-Fi (needs openssl)
 npm start
