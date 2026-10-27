@@ -30,7 +30,7 @@ Every situation has its own screen with a plain next step: no microphone permiss
 
 ## How the sound works
 
-I wrote the modem rather than using ggwave or Quiet.js. ggwave is the closest fit, but it needs a WebAssembly build. Owning the protocol also made two things possible that matter here: combining repeated frames to reach the back row, and drawing the code in the UI symbol by symbol.
+The modem is written from scratch rather than built on ggwave or Quiet.js. ggwave is the closest fit, but it needs a WebAssembly build. A custom protocol also makes two things possible that matter here: combining repeated frames to reach the back row, and drawing the code in the UI symbol by symbol.
 
 **Tones.** 16-ary frequency shift keying. Each 100 ms symbol is one tone out of 16, with 12 ms raised-cosine ramps so an 18 kHz tone does not click.
 
@@ -77,7 +77,7 @@ The goal is proportionate defence for a college, not a bank. Each attack below i
 | Claim someone else's roll number before they do | The first phone wins. When the real student checks in, their phone is flagged as new and the lecturer sees it. The lecturer can unlink a phone from the class page. | A proper fix is college sign-in (v2). |
 | Check in, then leave | Not covered. | Random re-checks during the lecture (v2). |
 
-**Trade-offs I chose:**
+**Trade-offs:**
 
 - **Flag, don't block.** Phones break and batteries die. A new phone, or a check-in in audible mode, is recorded and marked for the lecturer rather than refused. The lecturer can also mark anyone present by hand. A system that wrongly marks honest students absent loses trust faster than one that lets the odd edge case through.
 - **No location, no Wi-Fi checks.** GPS is unreliable indoors and invasive. Campus Wi-Fi addresses are shared by hundreds of students and change with mobile data. The sound is a better proximity signal than either.
