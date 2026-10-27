@@ -89,7 +89,7 @@ The goal is proportionate defence for a college, not a bank. Each attack below i
 
 ## What works where
 
-Browsers only give pages the microphone over **https**. On `localhost` that is automatic. For phones on the same Wi-Fi, run `npm run cert` to make a self-signed certificate, then tap through the browser warning once. A tunnel (for example `cloudflared tunnel --url http://localhost:8080`) gives a trusted https link instead; set `EARSHOT_PUBLIC_URL` so the dashboard shows it.
+Browsers only give pages the microphone over **https**. On `localhost` that is automatic. For phones on the same Wi-Fi, run `npm run cert` to make a self-signed certificate, then tap through the browser warning once. `npm run live` gives a trusted https link through a tunnel instead (see [Test with two devices](#test-with-two-devices)). Behind any other proxy, set `EARSHOT_PUBLIC_URL` so the dashboard shows the right link, and `EARSHOT_TRUST_PROXY=1` so rate limits use the forwarded address.
 
 | | Expected | Notes |
 | --- | --- | --- |
@@ -116,6 +116,17 @@ To see the live register fill without a room full of phones, start a session for
 ```sh
 node scripts/simulate-class.js CS201 40 30   # 40 phones over 30 seconds
 ```
+
+### Test with two devices
+
+`npm run live` starts the server and opens a [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/) (needs `cloudflared`; no account). It prints a public `https://….trycloudflare.com` address with a trusted certificate, so any laptop or phone on any network can open it and use the microphone with no warnings. Without `cloudflared` it falls back to `localhost.run` over ssh. The address changes on every run.
+
+1. **Laptop A (lecturer)** runs `npm run seed` once, then `npm run live`, and opens the `localhost` lecturer link it prints.
+2. **Check the signal first.** On A, open `/lab` and choose **Play test codes**. On B, open the public `/lab` link and choose **Listen**. Decoded codes appear in the log within a few seconds. Try both bands and different distances.
+3. **Run a session.** On A, start a session for **PH110** (its class list is open, so any roll number works). On B, open `<public address>/c/PH110`, enter a roll number and name, and tap **Start listening**. B's name appears in A's register.
+4. **Try to cheat.** Open the same link in a second browser on B and check in as someone else (it is a new phone, so it lands in **Needs review**). Check in a second person from the same browser (refused). Play a recording of the sound 30 seconds later (refused). Put A on speaker over a WhatsApp call to B (the quiet band does not get through).
+
+On the same Wi-Fi without a tunnel, `npm run cert` and `npm start` work too, but phones show a certificate warning first, and many college networks block devices from reaching each other.
 
 ### Before a real class
 

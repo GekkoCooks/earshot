@@ -23,6 +23,16 @@ export function createApp({ db, lecturerKey, publicDir, now = () => Date.now(), 
   // sessionId -> Map(deviceId -> { state, level, at })
   const listeners = new Map();
 
+  // Behind a tunnel every request comes from 127.0.0.1, so use the forwarded
+  // address. Only when told to: the header is trivial to fake otherwise.
+  const clientIp = (req) => {
+    if (process.env.EARSHOT_TRUST_PROXY) {
+      const fwd = req.headers['cf-connecting-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+      if (fwd) return fwd;
+    }
+    return req.socket.remoteAddress;
+  };
+
   const isLecturer = (req) => {
     const key = parseCookies(req.headers.cookie).es_lecturer;
     if (!key) return false;
@@ -98,7 +108,7 @@ export function createApp({ db, lecturerKey, publicDir, now = () => Date.now(), 
   // ---------- lecturer ----------
 
   router.add('POST', '/api/login', async (req, res) => {
-    if (!limits.login.allow(req.socket.remoteAddress)) throw new HttpError(429, 'rate_limited');
+    if (!limits.login.allow(clientIp(req))) throw new HttpError(429, 'rate_limited');
     const { key } = await readJson(req);
     const a = Buffer.from(String(key || ''));
     const b = Buffer.from(lecturerKey);
@@ -317,7 +327,7 @@ export function createApp({ db, lecturerKey, publicDir, now = () => Date.now(), 
   });
 
   router.add('POST', '/api/join/:code/enrol', async (req, res, { code }) => {
-    if (!limits.enrolIp.allow(req.socket.remoteAddress)) throw new HttpError(429, 'rate_limited');
+    if (!limits.enrolIp.allow(clientIp(req))) throw new HttpError(429, 'rate_limited');
     const course = db.courses.byCode(code);
     if (!course) throw new HttpError(404, 'no_course');
     const { roll, name, publicKey, nonce, sig } = await readJson(req);
@@ -363,7 +373,7 @@ export function createApp({ db, lecturerKey, publicDir, now = () => Date.now(), 
   });
 
   router.add('POST', '/api/checkin', async (req, res) => {
-    const ip = req.socket.remoteAddress;
+    const ip = clientIp(req);
     const body = await readJson(req);
     const { sessionId, roll, payload, band, nonce, sig, publicKey, meta } = body;
     const deviceId = thumbprint(publicKey);

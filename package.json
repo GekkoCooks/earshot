@@ -10,6 +10,7 @@
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "live": "node --disable-warning=ExperimentalWarning scripts/live.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
     "cert": "node scripts/make-cert.js",
     "seed": "node --disable-warning=ExperimentalWarning scripts/seed.js",
