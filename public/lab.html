@@ -14,18 +14,14 @@
     <div class="lab">
       <header class="s-top">
         <a class="wordmark" href="/">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <circle cx="6" cy="12" r="2" fill="currentColor" stroke="none" />
-            <path d="M11 7.5a6 6 0 0 1 0 9" />
-            <path d="M15 4.5a10 10 0 0 1 0 15" />
-          </svg>
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="1" y="12" width="5" height="3.2" rx="1"/><rect x="7.5" y="4.5" width="5" height="3.2" rx="1"/><rect x="14" y="8.5" width="5" height="3.2" rx="1"/></svg>
           Earshot
         </a>
         <span class="s-course">Field test</span>
       </header>
 
       <div class="s-copy">
-        <h1>Check a room before class</h1>
+        <h1 class="s-title lab-title">Room check</h1>
         <p>Play test codes from the laptop, then walk to the back row with a phone on this page in listen mode. Nothing here touches attendance.</p>
       </div>
 
@@ -35,17 +31,17 @@
       </div>
 
       <section id="listen" class="lab-pane">
-        <div class="stage">
-          <div class="stage-label"><span>Quiet band, 18 to 20 kHz</span><span class="num" id="lvQuiet">0 dB</span></div>
-          <canvas class="waterfall" id="wfQuiet"></canvas>
+        <div class="lab-band">
+          <div class="lab-label"><span>Quiet band, 18 to 20 kHz</span><b class="num" id="lvQuiet">0 dB</b></div>
+          <div class="s-viz lab-viz"><canvas class="waterfall" id="wfQuiet"></canvas></div>
         </div>
-        <div class="stage">
-          <div class="stage-label"><span>Audible band, 2.4 to 4.4 kHz</span><span class="num" id="lvAudible">0 dB</span></div>
-          <canvas class="waterfall" id="wfAudible"></canvas>
+        <div class="lab-band">
+          <div class="lab-label"><span>Audible band, 2.4 to 4.4 kHz</span><b class="num" id="lvAudible">0 dB</b></div>
+          <div class="s-viz lab-viz"><canvas class="waterfall" id="wfAudible"></canvas></div>
         </div>
         <dl class="lab-stats" id="stats"></dl>
         <ol class="lab-log" id="log" aria-live="polite"></ol>
-        <div class="s-actions"><button class="btn btn-primary btn-lg btn-block" id="listenBtn">Start listening</button></div>
+        <div class="s-actions"><button class="btn btn-blue btn-lg btn-block" id="listenBtn">Start listening</button></div>
       </section>
 
       <section id="play" class="lab-pane" hidden>
@@ -55,7 +51,7 @@
         </div>
         <label class="volume"><span>Volume</span><input type="range" id="vol" min="0.05" max="1" step="0.05" value="0.8" /></label>
         <p class="muted lab-note">Turn the laptop's own volume up as well. Test codes repeat every 1.6 seconds and change every 8.</p>
-        <div class="s-actions"><button class="btn btn-primary btn-lg btn-block" id="playBtn">Play test codes</button></div>
+        <div class="s-actions"><button class="btn btn-blue btn-lg btn-block" id="playBtn">Play test codes</button></div>
       </section>
     </div>
   </body>

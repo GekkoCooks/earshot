@@ -129,7 +129,17 @@ export function createApp({ db, lecturerKey, publicDir, now = () => Date.now(), 
 
   router.add('GET', '/api/courses', (req, res) => {
     requireLecturer(req);
-    sendJson(res, 200, { courses: db.courses.all() });
+    // Recent attendance rates for a small trend line per class.
+    const courses = db.courses.all().map((c) => ({
+      ...c,
+      recent: db.sessions
+        .forCourse(c.id)
+        .filter((x) => x.ended_at)
+        .slice(0, 12)
+        .reverse()
+        .map((x) => (c.students ? x.present / c.students : 0)),
+    }));
+    sendJson(res, 200, { courses });
   });
 
   router.add('POST', '/api/courses', async (req, res) => {

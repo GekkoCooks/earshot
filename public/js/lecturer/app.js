@@ -2,8 +2,8 @@
 // end-of-session summary. Hash routes: #/, #/class/:id, #/session/:id
 
 import { Transmitter } from './transmitter.js';
-import { syncClock } from '../lib/clock.js';
-import { SYNC_SLOTS } from '../modem/protocol.js';
+import { syncClock, serverNow } from '../lib/clock.js';
+import { SYNC_SLOTS, WINDOW_MS, bankOf } from '../modem/protocol.js';
 import { qrSvg } from '../lib/qr.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -12,8 +12,10 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const fmtTime = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 const fmtDate = (t) => new Date(t).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const TICK = '<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const TICK = '<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 // ---------- api ----------
 
@@ -73,16 +75,16 @@ const live = {
   tx: null,
   es: null,
   filter: 'all',
+  query: '',
   fresh: new Set(),
-  anim: null,
   joinBase: null,
   volume: 0.8,
+  lastCount: null,
 };
 
 function stopLive({ keepSound = false } = {}) {
   live.es?.close();
   live.es = null;
-  cancelAnimationFrame(live.anim);
   clearInterval(live.animTimer);
   if (!keepSound) {
     live.tx?.stop();
@@ -90,6 +92,27 @@ function stopLive({ keepSound = false } = {}) {
     live.wake?.release?.();
     live.wake = null;
   }
+}
+
+// A small trend line of recent attendance, one point per session.
+function trend(rates) {
+  if (rates.length < 2) return '<div class="trend"><span>Not enough sessions for a trend</span></div>';
+  const w = 220;
+  const h = 36;
+  // Scale to the data so a drop from 90% to 70% is visible, with 100% at the top.
+  const lo = Math.max(0, Math.min(0.5, Math.min(...rates) - 0.1));
+  const y = (r) => h - ((r - lo) / (1 - lo)) * h;
+  const pts = rates.map((r, i) => [(i / (rates.length - 1)) * w, y(r)]);
+  const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
+  const avg = Math.round((100 * rates.reduce((a, b) => a + b, 0)) / rates.length);
+  const [lx, ly] = pts.at(-1);
+  return `<div class="trend" aria-label="Average attendance ${avg} percent">
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <line x1="0" x2="${w}" y1="${y(0.75)}" y2="${y(0.75)}" stroke="var(--rule-strong)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>
+      <path d="${d}" fill="none" stroke="var(--ink)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+      <circle cx="${lx}" cy="${ly}" r="3" fill="var(--blue)"/>
+    </svg>
+    <span>${avg}% average, last ${rates.length} sessions. Dashed line is 75%.</span></div>`;
 }
 
 // ---------- views ----------
@@ -100,8 +123,8 @@ const views = {
     crumbs([]);
     app.innerHTML = `
       <form class="login" id="login">
-        <h1>Lecturer sign in</h1>
-        <p>Open the lecturer link printed in the terminal when the server started, or paste the key from it here.</p>
+        <h1>Sign in</h1>
+        <p>Open the lecturer link printed in the terminal when the server started, or paste the key from it.</p>
         <div class="field"><label for="key">Lecturer key</label>
           <input class="input" id="key" name="key" autocomplete="off" spellcheck="false" ${error ? 'aria-invalid="true"' : ''} /></div>
         ${error ? `<p class="form-error" role="alert">${esc(error)}</p>` : ''}
@@ -126,83 +149,96 @@ const views = {
     const rows = courses
       .map(
         (c) => `
-        <div class="class-row ${c.live_session ? 'live' : ''}">
-          <div>
-            <a class="name" href="#/class/${c.id}"><span class="code">${esc(c.code)}</span><span class="title">${esc(c.title)}</span></a>
-            <p class="meta">${c.live_session ? '<span class="live-dot" aria-hidden="true"></span> Session running. ' : ''}${plural(c.students, 'student')}, ${
-              c.last_session ? `last session ${fmtDate(c.last_session)}` : 'no sessions yet'
-            }</p>
-          </div>
+        <li class="class-row">
+          <a class="class-main" href="#/class/${c.id}">
+            <span class="code">${esc(c.code)}</span>
+            <span class="title">${esc(c.title)}</span>
+            <span class="meta">${
+              c.live_session
+                ? '<span class="live-tag"><span class="live-dot" aria-hidden="true"></span>Session running</span>'
+                : `${plural(c.students, 'student')}, ${c.last_session ? `last session ${fmtDate(c.last_session)}` : 'no sessions yet'}`
+            }</span>
+          </a>
+          ${trend(c.recent)}
           ${
             c.live_session
-              ? `<a class="btn btn-primary" href="#/session/${c.live_session}">Open session</a>`
-              : `<button class="btn btn-ink" data-act="start" data-id="${c.id}">Start session</button>`
+              ? `<a class="btn btn-blue" href="#/session/${c.live_session}">Open session</a>`
+              : `<button class="btn btn-primary" data-act="start" data-id="${c.id}">Start session</button>`
           }
-        </div>`,
+        </li>`,
       )
       .join('');
     app.innerHTML = `
-      <div class="page-head">
-        <div><h1>Classes</h1><p>Start a session when you begin teaching. Students check in by listening.</p></div>
-        <button class="btn" data-act="new-class">New class</button>
-      </div>
-      ${
-        courses.length
-          ? `<div class="classes">${rows}</div>`
-          : `<div class="empty"><h2>Add your first class</h2>
-             <p>Give it a code, a name and the class list. Students use the code to find it, like /c/CS201.</p>
-             <button class="btn btn-primary" data-act="new-class">New class</button></div>`
-      }`;
+      <div>
+        <div class="page-head">
+          <div><h1>Classes</h1><p>Start a session when you begin teaching. Students check in by listening for a few seconds.</p></div>
+          <div class="actions"><button class="btn" data-act="new-class">New class</button></div>
+        </div>
+        ${
+          courses.length
+            ? `<ol class="class-list">${rows}</ol>`
+            : `<div class="empty"><h2>Add your first class</h2>
+               <p>Give it a code, a name and the class list. Students use the code to find it, like /c/CS201.</p>
+               <button class="btn btn-primary" data-act="new-class">New class</button></div>`
+        }
+      </div>`;
   },
 
   async course(id) {
     stopLive();
     const { course, students, sessions } = await api('GET', `/api/courses/${id}`);
-    crumbs([{ label: 'Classes', href: '#/' }, { label: `${course.code} ${course.title}` }]);
+    crumbs([{ label: 'Classes', href: '#/' }, { label: course.code }]);
     const liveS = sessions.find((s) => !s.ended_at);
+    const total = students.length;
     app.innerHTML = `
-      <div class="page-head">
-        <div><h1>${esc(course.code)} ${esc(course.title)}</h1>
-          <p>${plural(students.length, 'student')}, ${plural(sessions.length, 'session')}. Students join at <b>/c/${esc(course.code)}</b>.</p></div>
-        <div class="join-actions">
-          <a class="btn" href="/api/courses/${course.id}/export.csv" download>Export attendance</a>
-          ${
-            liveS
-              ? `<a class="btn btn-primary" href="#/session/${liveS.id}">Open session</a>`
-              : `<button class="btn btn-primary" data-act="start" data-id="${course.id}">Start session</button>`
-          }
+      <div>
+        <div class="page-head">
+          <div><h1>${esc(course.code)}</h1>
+            <p>${esc(course.title)}. ${plural(total, 'student')}, ${plural(sessions.length, 'session')}. Students join at <b>/c/${esc(course.code)}</b>.</p></div>
+          <div class="actions">
+            <a class="btn" href="/api/courses/${course.id}/export.csv" download>Export attendance</a>
+            ${
+              liveS
+                ? `<a class="btn btn-blue" href="#/session/${liveS.id}">Open session</a>`
+                : `<button class="btn btn-primary" data-act="start" data-id="${course.id}">Start session</button>`
+            }
+          </div>
         </div>
-      </div>
-      <div class="two">
-        <section class="block">
-          <h2>Sessions</h2>
-          ${
-            sessions.length
-              ? `<table class="table"><thead><tr><th>Date</th><th>Time</th><th>Present</th><th></th></tr></thead><tbody>
-                ${sessions
-                  .map(
-                    (s) => `<tr><td>${fmtDate(s.started_at)}</td><td class="n">${fmtTime(s.started_at)}${s.ended_at ? '' : ' <span class="tag tag-blue">Live</span>'}</td>
-                    <td class="n">${s.present} of ${students.length}${s.pending ? ` <span class="tag tag-hl">${s.pending} to review</span>` : ''}</td>
-                    <td style="text-align:right"><a class="btn" href="#/session/${s.id}">${s.ended_at ? 'View' : 'Open'}</a></td></tr>`,
-                  )
-                  .join('')}</tbody></table>`
-              : '<p class="muted">No sessions yet.</p>'
-          }
-        </section>
-        <section class="block">
-          <h2>Class list <button class="btn btn-quiet" data-act="add-students" data-id="${course.id}">Add students</button></h2>
-          ${
-            students.length
-              ? `<table class="table"><thead><tr><th>Roll</th><th>Name</th><th>Phone</th></tr></thead><tbody>
-                ${students
-                  .map(
-                    (st) => `<tr><td class="n"><b>${esc(st.roll)}</b></td><td>${esc(st.name)}${st.self_added ? ' <span class="tag">Self-added</span>' : ''}</td>
-                    <td>${st.device_id ? `Linked <button class="btn btn-quiet" data-act="reset-device" data-id="${st.id}" data-name="${esc(st.name)}">Unlink</button>` : '<span class="muted">Not yet</span>'}</td></tr>`,
-                  )
-                  .join('')}</tbody></table>`
-              : `<p class="muted">${course.open_roster ? 'Open class list: students add themselves when they first check in.' : 'No students yet.'}</p>`
-          }
-        </section>
+        <div class="two">
+          <section class="block">
+            <h2>Sessions</h2>
+            ${
+              sessions.length
+                ? `<ol class="rows">${sessions
+                    .map(
+                      (s) => `<li>
+                        <span class="date"><b>${fmtDate(s.started_at)}</b><span>${fmtTime(s.started_at)}</span></span>
+                        <span class="att"><span class="track"><i style="width:${pct(s.present, total)}%"></i></span>
+                          <span>${s.present} of ${total} present${s.pending ? `, ${s.pending} to review` : ''}</span></span>
+                        <a class="btn ${s.ended_at ? '' : 'btn-blue'}" href="#/session/${s.id}">${s.ended_at ? 'View' : 'Open'}</a></li>`,
+                    )
+                    .join('')}</ol>`
+                : '<p class="muted" style="padding-top:16px">No sessions yet.</p>'
+            }
+          </section>
+          <section class="block">
+            <h2>Class list <button class="btn btn-quiet" data-act="add-students" data-id="${course.id}">Add students</button></h2>
+            ${
+              students.length
+                ? `<ol class="rows roster">${students
+                    .map(
+                      (st) => `<li><span class="roll">${esc(st.roll)}</span><span>${esc(st.name)}${st.self_added ? ' <span class="tag">Self-added</span>' : ''}</span>
+                      <span class="phone">${
+                        st.device_id
+                          ? `Phone linked <button class="btn btn-quiet" data-act="reset-device" data-id="${st.id}" data-name="${esc(st.name)}">Unlink</button>`
+                          : 'No phone yet'
+                      }</span></li>`,
+                    )
+                    .join('')}</ol>`
+                : `<p class="muted" style="padding-top:16px">${course.open_roster ? 'Open class list: students add themselves when they first check in.' : 'No students yet.'}</p>`
+            }
+          </section>
+        </div>
       </div>`;
   },
 
@@ -211,6 +247,7 @@ const views = {
     if (live.id !== id) {
       live.tx?.stop();
       live.tx = null;
+      live.lastCount = null;
     }
     live.id = id;
     const data = await api('GET', `/api/sessions/${id}`);
@@ -231,42 +268,50 @@ const views = {
     const present = data.checkins.filter((c) => c.status === 'present').length;
     const pending = data.checkins.filter((c) => c.status === 'pending');
     const absent = data.students.filter((s) => !by.has(s.id));
-    const mins = Math.round((data.session.endedAt - data.session.startedAt) / 60000);
+    const total = data.students.length;
+    const mins = Math.max(1, Math.round((data.session.endedAt - data.session.startedAt) / 60000));
     app.innerHTML = `
-      <div class="page-head">
-        <div><h1>${esc(data.course.code)} on ${fmtDate(data.session.startedAt)}</h1>
-          <p>${fmtTime(data.session.startedAt)} to ${fmtTime(data.session.endedAt)}, ${plural(mins, 'minute')}.</p></div>
-        <div class="join-actions"><a class="btn btn-primary" href="/api/sessions/${data.session.id}/export.csv" download>Download CSV</a></div>
-      </div>
-      <div class="register-head"><div class="count"><b>${present}</b><span>of ${data.students.length} present</span></div></div>
-      <div class="bar"><i style="width:${data.students.length ? (100 * present) / data.students.length : 0}%"></i></div>
-      <div class="summary-grid">
-        <section class="block"><h2>Not checked in <span class="muted">${absent.length}</span></h2>
-          ${
-            absent.length
-              ? `<ul class="absent-list">${absent
-                  .map((s) => `<li><span><span class="roll">${esc(s.roll)}</span>${esc(s.name)}</span><button class="btn btn-quiet" data-act="mark" data-sid="${s.id}" data-action="present">Mark present</button></li>`)
-                  .join('')}</ul>`
-              : '<p class="muted">Everyone on the list checked in.</p>'
-          }
-        </section>
-        <section class="block"><h2>Needs review <span class="muted">${pending.length}</span></h2>
-          ${
-            pending.length
-              ? `<ul class="absent-list">${pending
-                  .map(
-                    (c) => `<li><span><span class="roll">${esc(c.roll)}</span>${esc(c.name)} <span class="tag tag-hl">${esc(c.flags.join(', '))}</span></span>
-                    <span><button class="btn btn-quiet" data-act="mark" data-sid="${c.studentId}" data-action="approve">Approve</button></span></li>`,
-                  )
-                  .join('')}</ul>`
-              : '<p class="muted">Nothing to review.</p>'
-          }
-        </section>
+      <div>
+        <div class="page-head">
+          <div><h1>${esc(data.course.code)}, ${fmtDate(data.session.startedAt)}</h1>
+            <p>${fmtTime(data.session.startedAt)} to ${fmtTime(data.session.endedAt)}, ${plural(mins, 'minute')}. Attendance is closed.</p></div>
+          <div class="actions"><a class="btn btn-primary" href="/api/sessions/${data.session.id}/export.csv" download>Download CSV</a></div>
+        </div>
+        <div class="summary-count">
+          <div class="count"><b>${present}</b><span>of <strong>${total}</strong><br />present</span></div>
+          <div class="bar"><i style="width:${pct(present, total)}%"></i></div>
+        </div>
+        <div class="summary-grid">
+          <section class="block"><h2>Not checked in <span class="muted">${absent.length}</span></h2>
+            ${
+              absent.length
+                ? `<ol class="rows absent-list">${absent
+                    .map(
+                      (s) =>
+                        `<li><span class="roll"><b>${esc(s.roll)}</b></span><span>${esc(s.name)}</span><button class="btn btn-quiet" data-act="mark" data-sid="${s.id}" data-action="present">Mark present</button></li>`,
+                    )
+                    .join('')}</ol>`
+                : '<p class="muted" style="padding-top:16px">Everyone on the list checked in.</p>'
+            }
+          </section>
+          <section class="block"><h2>Needs review <span class="muted">${pending.length}</span></h2>
+            ${
+              pending.length
+                ? `<ol class="rows absent-list">${pending
+                    .map(
+                      (c) => `<li><span class="roll"><b>${esc(c.roll)}</b></span><span>${esc(c.name)} <span class="tag tag-hl">${esc(c.flags.join(', '))}</span></span>
+                      <button class="btn" data-act="mark" data-sid="${c.studentId}" data-action="approve">Approve</button></li>`,
+                    )
+                    .join('')}</ol>`
+                : '<p class="muted" style="padding-top:16px">Nothing to review.</p>'
+            }
+          </section>
+        </div>
       </div>`;
   },
 };
 
-// ---------- live session rendering ----------
+// ---------- live session ----------
 
 function renderLive() {
   const d = live.view;
@@ -277,54 +322,58 @@ function renderLive() {
   const txSlots = Array.from({ length: 16 }, (_, i) => `<span class="${i < SYNC_SLOTS ? 'sync' : ''}"><i></i></span>`).join('');
 
   app.innerHTML = `
-    <div class="live">
-      <aside class="panel" aria-label="Session controls">
-        <section>
-          ${
-            sound
-              ? ''
-              : `<div class="resume"><p><b>Sound is off.</b> Browsers need a click before a page can play audio.</p>
-                 <button class="btn btn-primary" data-act="sound">Play sound</button></div>`
-          }
-          <p class="onair ${sound ? '' : 'paused'}" id="onair"><span class="live-dot" aria-hidden="true"></span>${sound ? 'Playing the check-in code' : 'Waiting to play'}</p>
-          <div class="tx" id="tx" aria-hidden="true">${txSlots}</div>
-          <p class="tx-caption" id="txCaption">The code changes every 8 seconds.</p>
-        </section>
-        <section>
-          <h2>Sound</h2>
+    <div>
+      ${
+        sound
+          ? ''
+          : `<div class="resume" role="status"><span>Sound is off. Browsers need a click before a page can play audio.</span>
+             <button class="btn" data-act="sound">Play the code</button></div>`
+      }
+      <section class="band" aria-label="Session">
+        <div>
+          <div class="count" aria-live="polite"><b id="countNum">0</b><span>of <strong id="countTotal">0</strong><br />present</span></div>
+          <div class="bar" aria-hidden="true"><i id="barPresent"></i><i class="pending" id="barPending"></i></div>
+          <div class="count-foot" id="countFoot"></div>
+        </div>
+        <div>
+          <div class="tx-head">
+            <span class="onair ${sound ? '' : 'paused'}"><span class="live-dot" aria-hidden="true"></span>${sound ? (mode === 'quiet' ? 'Playing quietly' : 'Playing audibly') : 'Not playing'}</span>
+            <span class="next-code" id="nextCode"></span>
+          </div>
+          <div class="tx ${sound ? '' : 'paused'}" id="tx" aria-hidden="true">${txSlots}</div>
+          <p class="tx-caption">The code this laptop is playing, symbol by symbol. The first four are the sync pattern.</p>
+          <div id="phones"></div>
+        </div>
+        <div class="join">
+          <button class="qr" data-act="qr" data-url="${esc(url)}" aria-label="Show the join QR code large">${qrSvg(url)}</button>
+          <div>
+            <p class="join-url"><span class="host">${esc(host)}</span><br />/c/${esc(d.course.code)}</p>
+            <div class="join-actions"><button class="btn" data-act="copy" data-url="${esc(url)}">Copy</button>
+            <button class="btn btn-quiet" data-act="qr" data-url="${esc(url)}">Show large</button></div>
+          </div>
+        </div>
+      </section>
+      <section class="controls" aria-label="Sound">
+        <div class="mode">
           <div class="seg" role="group" aria-label="Sound mode">
             <button data-act="mode" data-mode="quiet" aria-pressed="${mode === 'quiet'}">Quiet</button>
             <button data-act="mode" data-mode="audible" aria-pressed="${mode === 'audible'}">Audible</button>
           </div>
-          <p class="mode-note ${mode === 'audible' ? 'warn' : ''}" id="modeNote">${
+          <p class="mode-note ${mode === 'audible' ? 'warn' : ''}">${
             mode === 'quiet'
               ? 'Near-ultrasonic, 18 to 20 kHz. Most people will not notice it, and phone calls cannot carry it.'
-              : 'Audible chirps, 2.4 to 4.4 kHz. Reaches further, but it can be relayed over a phone call, so check-ins are marked.'
+              : 'Audible chirps, 2.4 to 4.4 kHz. Reaches further, but can be relayed over a call, so these check-ins are marked.'
           }</p>
-          <label class="volume"><span>Volume</span><input type="range" id="vol" min="0.1" max="1" step="0.05" value="${live.volume}" /></label>
-        </section>
-        <section>
-          <h2>Students open</h2>
-          <div class="join">
-            <button class="qr" data-act="qr" data-url="${esc(url)}" aria-label="Show the QR code large">${qrSvg(url)}</button>
-            <div>
-              <p class="join-url"><span class="host">${esc(host)}</span>/c/${esc(d.course.code)}</p>
-              <div class="join-actions"><button class="btn" data-act="copy" data-url="${esc(url)}">Copy link</button>
-              <button class="btn btn-quiet" data-act="qr" data-url="${esc(url)}">Show large</button></div>
-            </div>
-          </div>
-          <p class="mode-note">Sharing this link is fine. It only opens the page; the phone still has to hear the room.</p>
-        </section>
-        <section>
-          <h2>Phones listening now</h2>
-          <div id="phones"></div>
-        </section>
-        <section>
-          <button class="btn btn-block btn-danger" data-act="end">End session</button>
-        </section>
-      </aside>
+        </div>
+        <label class="volume"><span>Volume</span><input type="range" id="vol" min="0.1" max="1" step="0.05" value="${live.volume}" /></label>
+        <button class="btn btn-danger end" data-act="end">End session</button>
+      </section>
       <section aria-label="Register">
-        <div id="register"></div>
+        <div class="reg-head">
+          <div class="filters" role="group" aria-label="Filter the register" id="filters"></div>
+          <input class="input find" id="find" type="search" placeholder="Find a roll or name" value="${esc(live.query)}" aria-label="Find a student" />
+        </div>
+        <ul class="register" id="register"></ul>
       </section>
     </div>`;
 
@@ -332,6 +381,11 @@ function renderLive() {
     live.volume = Number(e.target.value);
     live.tx?.setVolume(live.volume);
   });
+  $('#find').addEventListener('input', (e) => {
+    live.query = e.target.value.trim().toLowerCase();
+    renderRegister();
+  });
+  live.lastCount = null;
   renderPhones();
   renderRegister();
 }
@@ -349,11 +403,26 @@ function renderPhones() {
         ? '<p class="hint-box">Several phones can barely hear the code. Turn the laptop volume up, or switch to Audible for a minute.</p>'
         : '<p class="hint-box">Several phones can barely hear the code. Turn the volume up or connect the laptop to the room speakers.</p>';
   }
-  el.innerHTML = `<div class="phones">
-      <div><b>${l.listening}</b><span>hearing you</span></div>
-      <div><b>${l.faint}</b><span>faint</span></div>
-      <div><b>${l.silent}</b><span>hearing nothing</span></div>
-    </div>${hint}`;
+  el.innerHTML = `<div class="phones"><span><b>${l.listening}</b>phones hearing you</span><span><b>${l.faint}</b>faint</span><span><b>${l.silent}</b>hearing nothing</span></div>${hint}`;
+}
+
+function updateCount(present, pending, total) {
+  const num = $('#countNum');
+  if (!num) return;
+  if (live.lastCount !== present) {
+    num.textContent = present;
+    if (live.lastCount !== null && !reduceMotion) {
+      num.animate([{ transform: 'translateY(0.25em)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    }
+    live.lastCount = present;
+  }
+  $('#countTotal').textContent = total;
+  $('#barPresent').style.width = `${pct(present, total)}%`;
+  $('#barPending').style.left = `${pct(present, total)}%`;
+  $('#barPending').style.width = `${pct(pending, total)}%`;
+  $('#countFoot').innerHTML = `<span><b>${pct(present, total)}%</b> of the class</span><span><b>${total - present - pending}</b> not yet</span>${
+    pending ? `<span><b>${pending}</b> to review</span>` : ''
+  }`;
 }
 
 function renderRegister() {
@@ -364,48 +433,47 @@ function renderRegister() {
   const present = d.checkins.filter((c) => c.status === 'present').length;
   const pending = d.checkins.filter((c) => c.status === 'pending').length;
   const total = d.students.length;
+  updateCount(present, pending, total);
+
   const f = live.filter;
+  $('#filters').innerHTML = [
+    ['all', `Everyone ${total}`],
+    ['waiting', `Not yet ${total - present - pending}`],
+    ['present', `Present ${present}`],
+    ['review', `Needs review ${pending}`],
+  ]
+    .map(([k, label]) => `<button data-act="filter" data-filter="${k}" aria-pressed="${f === k}">${label}</button>`)
+    .join('');
+
+  const q = live.query;
   const list = d.students.filter((s) => {
     const c = by.get(s.id);
+    if (q && !s.roll.toLowerCase().includes(q) && !s.name.toLowerCase().includes(q)) return false;
     if (f === 'present') return c?.status === 'present';
     if (f === 'waiting') return !c;
     if (f === 'review') return c?.status === 'pending';
     return true;
   });
 
-  el.innerHTML = `
-    <div class="register-head">
-      <div class="count" aria-live="polite"><b>${present}</b><span>of ${total} present</span></div>
-      <div class="filters" role="group" aria-label="Filter the register">
-        ${[
-          ['all', `All ${total}`],
-          ['waiting', `Not yet ${total - present - pending}`],
-          ['present', `Present ${present}`],
-          ['review', `Needs review ${pending}`],
-        ]
-          .map(([k, label]) => `<button data-act="filter" data-filter="${k}" aria-pressed="${f === k}">${label}</button>`)
-          .join('')}
-      </div>
-    </div>
-    <div class="bar" aria-hidden="true"><i style="width:${total ? (100 * present) / total : 0}%"></i></div>
-    ${
-      total === 0
-        ? `<div class="empty"><h2>No one on the list yet</h2><p>This class has an open list. Students appear here as they check in.</p></div>`
-        : `<ul class="register">${list
-            .map((s) => {
-              const c = by.get(s.id);
-              const cls = c ? c.status : '';
-              const when = !c
-                ? 'Not yet'
-                : c.status === 'pending'
-                  ? c.flags.join(', ') || 'Needs review'
-                  : `${fmtTime(c.at)}${c.method === 'manual' ? ', by you' : c.flags.includes('Audible mode') ? ', audible' : ''}`;
-              return `<li><button class="cell ${cls} ${live.fresh.has(s.id) ? 'fresh' : ''}" data-act="cell" data-sid="${s.id}"
-                aria-label="${esc(s.roll)} ${esc(s.name)}: ${esc(when)}">
-                ${TICK}<span class="roll">${esc(s.roll)}</span><span class="who">${esc(s.name)}</span><span class="when">${esc(when)}</span></button></li>`;
-            })
-            .join('')}</ul>`
-    }`;
+  if (total === 0) {
+    el.outerHTML = `<div class="empty" id="register"><h2>No one on the list yet</h2><p>This class has an open list. Students appear here as they check in.</p></div>`;
+    return;
+  }
+  el.innerHTML = list
+    .map((s) => {
+      const c = by.get(s.id);
+      const cls = c ? c.status : '';
+      const when = !c
+        ? 'Not yet'
+        : c.status === 'pending'
+          ? c.flags.join(', ') || 'Needs review'
+          : `${fmtTime(c.at)}${c.method === 'manual' ? ', by you' : c.flags.includes('Audible mode') ? ', audible' : ''}`;
+      return `<li><button class="cell ${cls} ${live.fresh.has(s.id) ? 'fresh' : ''}" data-act="cell" data-sid="${s.id}"
+        aria-label="${esc(s.roll)} ${esc(s.name)}: ${esc(when)}">
+        ${TICK}<span class="roll">${esc(s.roll)}</span><span class="who">${esc(s.name)}</span><span class="when">${esc(when)}</span></button></li>`;
+    })
+    .join('');
+  if (!list.length) el.innerHTML = '<li style="grid-column:1/-1;padding:24px 16px" class="muted">No one matches.</li>';
   live.fresh.clear();
 }
 
@@ -442,17 +510,24 @@ function connectStream(id) {
   es.addEventListener('ended', () => route());
 }
 
+// Keep the code strip in step with what the speakers are playing.
 function startNowPlaying() {
   clearInterval(live.animTimer);
   live.animTimer = setInterval(async () => {
+    const next = $('#nextCode');
+    if (next) {
+      const left = Math.ceil((WINDOW_MS - ((serverNow() - live.view.session.startedAt) % WINDOW_MS)) / 1000);
+      next.textContent = `New code in ${left} s`;
+    }
     const tx = $('#tx');
     if (!tx || !live.tx) return;
     const np = await live.tx.nowPlaying();
     if (!np) return;
     const spans = tx.children;
     for (let i = 0; i < 16; i++) {
-      spans[i].style.setProperty('--v', String(np.tones[i] / 15));
+      spans[i].style.setProperty('--v', String((np.tones[i] * 2 + bankOf(i) + 0.5) / 32));
       spans[i].classList.toggle('now', i === np.slot);
+      spans[i].classList.toggle('played', i < np.slot && i >= SYNC_SLOTS);
     }
   }, 50);
 }
@@ -469,7 +544,7 @@ async function startSound() {
   }
   await syncClock();
   await ready;
-  renderLive();
+  if (live.id === d.session.id && !d.session.endedAt) renderLive();
 }
 
 // ---------- register cell menu ----------
@@ -575,7 +650,7 @@ function confirmEnd() {
   dialog(
     `<form class="dlg" method="dialog">
       <h2>End this session?</h2>
-      <p class="muted">${present} of ${d.students.length} checked in. Students who have not checked in will be marked absent, and the sound stops.</p>
+      <p class="muted">${present} of ${d.students.length} checked in. Everyone else is marked absent, and the sound stops.</p>
       <p class="form-error" role="alert"></p>
       <div class="dlg-actions"><button class="btn btn-quiet" type="button" data-close>Keep going</button><button class="btn btn-primary" type="submit">End session</button></div>
     </form>`,
@@ -587,6 +662,17 @@ function confirmEnd() {
       route();
     },
   );
+}
+
+function qrDialog(url) {
+  const dlg = document.createElement('dialog');
+  dlg.className = 'qr-big';
+  dlg.innerHTML = `<div class="qr-big-inner">${qrSvg(url)}<p class="join-url">${esc(url.replace(/^https?:\/\//, ''))}</p>
+    <button class="btn" data-close>Close</button></div>`;
+  document.body.append(dlg);
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.addEventListener('click', (ev) => (ev.target === dlg || ev.target.closest('[data-close]')) && dlg.close());
+  dlg.showModal();
 }
 
 // ---------- events ----------
@@ -620,14 +706,7 @@ document.addEventListener('click', async (e) => {
       await navigator.clipboard?.writeText(el.dataset.url);
       toast('Link copied');
     } else if (act === 'qr') {
-      const dlg = document.createElement('dialog');
-      dlg.className = 'qr-big';
-      dlg.innerHTML = `<div class="qr-big-inner">${qrSvg(el.dataset.url)}<p class="join-url">${esc(el.dataset.url.replace(/^https?:\/\//, ''))}</p>
-        <button class="btn" data-close>Close</button></div>`;
-      document.body.append(dlg);
-      dlg.addEventListener('close', () => dlg.remove());
-      dlg.addEventListener('click', (ev) => (ev.target === dlg || ev.target.closest('[data-close]')) && dlg.close());
-      dlg.showModal();
+      qrDialog(el.dataset.url);
     } else if (act === 'end') {
       confirmEnd();
     } else if (act === 'filter') {
@@ -659,9 +738,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('beforeunload', (e) => {
-  if (live.tx && live.view && !live.view.session.endedAt) {
-    e.preventDefault();
-  }
+  if (live.tx && live.view && !live.view.session.endedAt) e.preventDefault();
 });
 
 // ---------- routing ----------

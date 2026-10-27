@@ -25,7 +25,7 @@ Nobody installs anything. It is a web page.
 | --- | --- | --- |
 | ![Ready](docs/screenshots/student-ready.png) | ![Catching](docs/screenshots/student-catching.png) | ![Present](docs/screenshots/student-present.png) |
 
-The listening view draws what the phone actually hears: a scrolling spectrogram of the tone band, where the code shows up as a staircase of tones. Below it, 12 slots fill in as each symbol is caught, each mark at the pitch it was heard at. When the code is complete, the marks line up and turn into the check.
+The listening view draws what the phone actually hears: a scrolling spectrogram of the tone band runs edge to edge, and the code shows up in it as a staircase of tones. Over it sit 12 slots. While waiting they rest on a centre line; as each symbol is caught, its mark jumps to the exact height of that tone in the spectrogram. When the code is complete, the marks slide back onto one line, and that line opens into a full-screen ink-blue "Present". The outcome colour fills the whole screen (blue for present, highlighter yellow for needs review), so a lecturer can check a phone from across the room.
 
 Every situation has its own screen with a plain next step: no microphone permission, the wrong (non-https) link, a faint signal, nothing heard, a new phone, a phone that already checked someone in, a session that ended, no connection. They are all on one page at `/states`.
 

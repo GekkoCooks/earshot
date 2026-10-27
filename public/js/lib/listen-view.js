@@ -67,18 +67,28 @@ export class Waterfall {
 
 export function slotsHtml(n = 12) {
   let s = '';
-  for (let i = 0; i < n; i++) s += `<span class="slot" data-i="${i}"><i></i></span>`;
+  for (let i = 0; i < n; i++) s += `<span class="slot" data-i="${i}" style="--i:${i}"><i></i></span>`;
   return `<div class="slots" aria-hidden="true">${s}</div>`;
 }
 
+// Data slot i is frame slot i + 4, so its bank is i % 2. Placing the mark at
+// row (tone * 2 + bank) of 32 puts it exactly where that tone shows in the
+// spectrogram behind it.
+export function slotHeight(i, value) {
+  return (value * 2 + (i % 2) + 0.5) / 32;
+}
+
 export function setSlot(root, i, value, confidence) {
-  const el = root.querySelector(`.slot[data-i="${i}"]`);
+  const el = root?.querySelector(`.slot[data-i="${i}"]`);
   if (!el) return;
-  el.style.setProperty('--v', String(value / 15));
+  el.style.setProperty('--v', String(slotHeight(i, value)));
   el.classList.add('on');
   el.classList.toggle('weak', confidence < 0.65);
+  root.querySelectorAll('.slot.reading').forEach((s) => s.classList.remove('reading'));
+  el.nextElementSibling?.classList.add('reading');
 }
 
 export function clearSlots(root) {
-  root.querySelectorAll('.slot').forEach((el) => el.classList.remove('on', 'weak'));
+  root?.querySelectorAll('.slot').forEach((el) => el.classList.remove('on', 'weak', 'reading'));
+  root?.querySelector('.slot')?.classList.add('reading');
 }

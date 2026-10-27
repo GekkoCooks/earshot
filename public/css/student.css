@@ -1,43 +1,316 @@
-/* Student check-in. One column, thumb-reachable action at the bottom. */
+/* Student check-in. The screen is the instrument: no boxes, the signal runs
+   edge to edge, one heavy word says what is happening, and the whole screen
+   takes the colour of the outcome so it can be read from across a room. */
+
+body {
+  transition: background-color 0.5s var(--ease-out), color 0.5s var(--ease-out);
+}
+body[data-tone="blue"] {
+  --paper: var(--blue);
+  --ink: var(--on-blue);
+  --pencil: color-mix(in srgb, var(--on-blue) 72%, transparent);
+  --rule: color-mix(in srgb, var(--on-blue) 22%, transparent);
+  background: var(--blue);
+  color: var(--on-blue);
+}
+body[data-tone="hl"] {
+  --paper: var(--hl);
+  --ink: var(--on-hl);
+  --pencil: color-mix(in srgb, var(--on-hl) 72%, transparent);
+  --rule: color-mix(in srgb, var(--on-hl) 22%, transparent);
+  background: var(--hl);
+  color: var(--on-hl);
+}
 
 .s-shell {
   min-height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr;
-  max-width: 480px;
+  max-width: 520px;
   margin: 0 auto;
-  padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  padding: max(10px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
 }
 
 .s-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
+  height: 52px;
 }
 .s-course {
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: var(--t-sm);
+  letter-spacing: -0.01em;
   color: var(--pencil);
-  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .s-main {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  gap: 0;
-  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .s-loading {
-  place-self: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 3px solid var(--line);
-  border-top-color: var(--blue);
-  animation: spin 0.9s linear infinite;
-  grid-row: 1 / -1;
+  margin: auto;
+  display: flex;
+  gap: 5px;
+}
+.s-loading i {
+  width: 6px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--ink);
+  animation: load 0.9s var(--ease-out) infinite;
+}
+.s-loading i:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.s-loading i:nth-child(3) {
+  animation-delay: 0.24s;
+}
+@keyframes load {
+  50% {
+    transform: scaleY(0.35);
+    opacity: 0.4;
+  }
+}
+
+/* ---------- the instrument ---------- */
+
+.s-viz {
+  position: relative;
+  height: clamp(240px, 46dvh, 420px);
+  margin: 8px -20px 0;
+  overflow: hidden;
+  border-block: 1px solid var(--rule);
+}
+.s-viz .waterfall {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--blue);
+  opacity: 0.55;
+}
+
+.slots {
+  position: absolute;
+  inset: 0 20px;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+}
+.slot {
+  position: relative;
+  border-left: 1px solid var(--rule);
+}
+.slot:last-child {
+  border-right: 1px solid var(--rule);
+}
+.slot i {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  height: 7px;
+  border-radius: 2px;
+  bottom: calc(var(--v, 0.5) * 100% - 3.5px);
+  background: var(--ink);
+  opacity: 0;
+  transform: scaleX(0.2);
+  transition:
+    opacity 0.12s,
+    transform 0.32s var(--ease-snap),
+    bottom 0.5s cubic-bezier(0.7, 0, 0.2, 1) calc(var(--i, 0) * 28ms);
+}
+.slot.on i {
+  opacity: 1;
+  transform: scaleX(1);
+}
+.slot.weak i {
+  opacity: 0.4;
+}
+/* Empty slots wait on the centre line in a slow travelling wave. When a
+   symbol is caught, its mark flies from there to the pitch it was heard at. */
+.slot:not(.on) i {
+  opacity: 0.5;
+  background: var(--pencil-soft);
+  bottom: calc(50% - 3.5px);
+  transform: scaleX(0.45);
+  animation: idle 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 110ms);
+}
+@keyframes idle {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -10px;
+  }
+}
+/* Which slot is being read right now. */
+.slot.reading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+/* Caught: every mark slides onto one line. */
+.s-viz.caught .slot i {
+  opacity: 1;
+  transform: scaleX(1.25);
+  bottom: calc(50% - 3.5px);
+}
+
+.s-sig {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: var(--t-xs);
+  font-weight: 650;
+  color: var(--pencil);
+  font-variant-numeric: tabular-nums;
+}
+.meter {
+  display: inline-flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 12px;
+}
+.meter b {
+  display: block;
+  width: 3px;
+  border-radius: 1px;
+  background: var(--rule-strong);
+  transition: background-color 0.15s;
+}
+.meter b:nth-child(1) { height: 4px; }
+.meter b:nth-child(2) { height: 6px; }
+.meter b:nth-child(3) { height: 8px; }
+.meter b:nth-child(4) { height: 10px; }
+.meter b:nth-child(5) { height: 12px; }
+.meter b.on {
+  background: var(--ink);
+}
+
+/* ---------- words ---------- */
+
+.s-copy {
+  display: grid;
+  gap: 14px;
+  padding-top: 20px;
+}
+.s-title {
+  font-size: clamp(3rem, 15vw, 4.75rem);
+  letter-spacing: -0.05em;
+  line-height: 0.9;
+}
+.s-copy > p {
+  font-size: var(--t-md);
+  color: var(--pencil);
+  max-width: 34ch;
+}
+.s-copy > p b {
+  color: var(--ink);
+}
+
+.s-who {
+  display: grid;
+  grid-template-columns: 5.5em 1fr;
+  margin: 10px 0 0;
+  font-size: var(--t-md);
+}
+.s-who dt,
+.s-who dd {
+  padding: 11px 0;
+  border-top: 1px solid var(--rule);
+  margin: 0;
+}
+.s-who dt {
+  color: var(--pencil);
+}
+.s-who dd {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.s-steps {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.s-steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 2em 1fr;
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-md);
+}
+.s-steps li::before {
+  content: counter(step);
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--pencil);
+  font-variant-numeric: tabular-nums;
+}
+.s-steps.plain li::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-top: 0.55em;
+  border-radius: 2px;
+  background: var(--ink);
+}
+
+.s-note {
+  padding: 12px 14px;
+  border-left: 4px solid var(--hl);
+  background: var(--hl-wash);
+  color: var(--ink);
+  font-size: var(--t-sm);
+}
+body[data-tone="hl"] .s-note {
+  border-color: var(--on-hl);
+  background: color-mix(in srgb, var(--on-hl) 8%, transparent);
+}
+
+/* The big check on the outcome screens. */
+.s-check {
+  width: 88px;
+  height: 88px;
+  margin-top: 28px;
+}
+.s-check path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: draw 0.5s 0.15s var(--ease-out) forwards;
+}
+.s-check.wait circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 8;
+  stroke-dasharray: 8 14;
+  transform-origin: center;
+  animation: spin 6s linear infinite;
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+[data-view="present"] .s-title,
+[data-view="already"] .s-title {
+  font-size: clamp(4.5rem, 24vw, 7rem);
 }
 @keyframes spin {
   to {
@@ -45,264 +318,63 @@
   }
 }
 
-/* ---------- the stage: what the phone hears ---------- */
-
-.stage {
-  position: relative;
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 27px, color-mix(in srgb, var(--line) 70%, transparent) 27px 28px),
-    var(--surface);
-  overflow: hidden;
-  padding: 16px 16px 14px;
-}
-.stage-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: var(--t-xs);
-  color: var(--pencil);
-  margin-bottom: 10px;
-  min-height: 1.5em;
-}
-.stage-label .meter {
-  display: inline-flex;
-  gap: 2px;
-  align-items: flex-end;
-  height: 12px;
-}
-.stage-label .meter b {
-  display: block;
-  width: 3px;
-  border-radius: 1px;
-  background: var(--line-strong);
-}
-.stage-label .meter b:nth-child(1) { height: 4px; }
-.stage-label .meter b:nth-child(2) { height: 6px; }
-.stage-label .meter b:nth-child(3) { height: 8px; }
-.stage-label .meter b:nth-child(4) { height: 10px; }
-.stage-label .meter b:nth-child(5) { height: 12px; }
-.stage-label .meter b.on {
-  background: var(--blue);
-}
-
-.waterfall {
-  display: block;
-  width: 100%;
-  height: 132px;
-  color: var(--blue);
-  border-radius: var(--r-sm);
-}
-
-.slots {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 4px;
-  margin-top: 12px;
-}
-.slot {
-  position: relative;
-  height: 52px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--pencil) 7%, transparent);
-}
-.slot i {
-  position: absolute;
-  left: 18%;
-  right: 18%;
-  height: 4px;
-  border-radius: 2px;
-  bottom: calc(6px + var(--v, 0.5) * (100% - 16px));
-  background: var(--blue);
-  opacity: 0;
-  transform: scaleX(0.3);
-  transition: opacity 0.18s, transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1), bottom 0.45s cubic-bezier(0.6, 0, 0.2, 1);
-}
-.slot.on i {
-  opacity: 1;
-  transform: scaleX(1);
-}
-.slot.weak i {
-  opacity: 0.45;
-}
-
-/* Caught: every mark slides to the same line, then the check is drawn. */
-.stage.caught .slot i {
-  opacity: 1;
-  transform: scaleX(1);
-  bottom: calc(50% - 2px);
-}
-.stage .check {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-}
-.stage .check svg {
-  width: 96px;
-  height: 96px;
-  opacity: 0;
-}
-.stage.done .check svg {
-  opacity: 1;
-}
-.stage.done .check circle {
-  fill: var(--blue);
-  transform-origin: center;
-  animation: pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both;
-}
-.stage.done .check path {
-  stroke: var(--on-blue);
-  stroke-dasharray: 40;
-  stroke-dashoffset: 40;
-  animation: draw 0.35s 0.2s ease-out forwards;
-}
-.stage.done .waterfall,
-.stage.done .slots {
-  opacity: 0.25;
-  transition: opacity 0.4s;
-}
-@keyframes pop {
-  from {
-    transform: scale(0.4);
-  }
-}
-@keyframes draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* A calmer stage for states that are not about listening. */
-.stage.icon {
-  display: grid;
-  place-items: center;
-  min-height: 236px;
-}
-.stage.icon svg {
-  width: 72px;
-  height: 72px;
-  color: var(--pencil-soft);
-}
-.stage.icon.blue svg {
-  color: var(--blue);
-}
-.stage.icon.hl svg {
-  color: var(--on-hl);
-}
-.stage.icon.hl {
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 27px, color-mix(in srgb, var(--hl) 25%, transparent) 27px 28px),
-    var(--hl-soft);
-  border-color: color-mix(in srgb, var(--hl) 50%, var(--line));
-}
-
-/* ---------- copy ---------- */
-
-.s-copy {
-  padding: 24px 4px 0;
-  display: grid;
-  gap: 8px;
-}
-.s-copy h1 {
-  font-size: var(--t-xl);
-}
-.s-copy p {
-  color: var(--pencil);
-  font-size: var(--t-md);
-}
-.s-copy .big {
-  font-family: var(--font-num);
-  font-size: var(--t-3xl);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+/* A large mark for problem states: says what kind of problem at a glance. */
+.s-glyph {
+  width: 64px;
+  height: 64px;
+  margin-top: 28px;
   color: var(--ink);
-}
-
-.s-who {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 16px;
-  margin-top: 16px;
-  padding: 14px 16px;
-  border-radius: var(--r-md);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  font-size: var(--t-sm);
-}
-.s-who dt {
-  color: var(--pencil);
-}
-.s-who dd {
-  margin: 0;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.s-tips {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 10px;
-  font-size: var(--t-sm);
-  color: var(--ink);
-}
-.s-tips li {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 8px;
-}
-.s-tips li::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  margin: 0.55em 0 0 6px;
-  border-radius: 50%;
-  background: var(--blue);
-}
-
-.s-note {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border-radius: var(--r-md);
-  background: var(--hl-soft);
-  color: var(--on-hl);
-  font-size: var(--t-sm);
-}
-.s-note.plain {
-  background: color-mix(in srgb, var(--pencil) 9%, transparent);
-  color: var(--pencil);
 }
 
 .s-actions {
   display: grid;
-  gap: 8px;
-  padding-top: 24px;
-  align-self: end;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 28px;
 }
 .s-foot {
   text-align: center;
   font-size: var(--t-xs);
   color: var(--pencil);
-  padding-top: 4px;
+}
+.s-foot a {
+  color: var(--ink);
+  font-weight: 650;
 }
 
 .s-form {
   display: grid;
-  gap: 16px;
-  padding-top: 20px;
+  gap: 18px;
+  padding-top: 28px;
+}
+.s-form .input {
+  font-size: 1.375rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
-.s-main > .enter {
-  animation: enter 0.28s ease-out both;
+/* Ink spreading out from the code line to fill the screen. */
+.flood {
+  position: fixed;
+  inset: 0;
+  background: var(--blue);
+  z-index: 10;
+  pointer-events: none;
 }
-@keyframes enter {
+
+.enter > * {
+  animation: rise 0.42s var(--ease-out) both;
+}
+.enter > *:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.enter > *:nth-child(3) {
+  animation-delay: 0.1s;
+}
+@keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(10px);
   }
 }

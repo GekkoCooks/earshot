@@ -9,6 +9,8 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const app = $('#app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const time = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const code = decodeURIComponent(location.pathname.split('/')[2] || '').toUpperCase();
 const params = new URLSearchParams(location.search);
@@ -25,27 +27,36 @@ const S = {
   view: null,
 };
 
-// ---------- icons ----------
+// ---------- glyphs: one per kind of problem ----------
 
-const ICON = {
-  mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/><path d="M3 3l18 18"/></svg>',
-  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>',
-  wait: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
-  closed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>',
-  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>',
-  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg>',
-  wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.8 16a5 5 0 0 1 6.4 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></svg>',
+const GLYPH = {
+  mic: '<path d="M24 8a8 8 0 0 1 8 8v12a8 8 0 0 1-16 0V16a8 8 0 0 1 8-8zM12 28a12 12 0 0 0 24 0M24 40v6M8 8l32 40"/>',
+  lock: '<rect x="10" y="22" width="28" height="22" rx="3"/><path d="M16 22v-6a8 8 0 0 1 16 0v6"/>',
+  wait: '<circle cx="24" cy="26" r="17"/><path d="M24 16v10l7 4"/>',
+  closed: '<path d="M10 6h20l8 8v30H10z"/><path d="M17 22h14M17 29h14M17 36h8"/>',
+  phone: '<rect x="14" y="4" width="20" height="40" rx="4"/><path d="M22 38h4"/>',
+  link: '<path d="M20 28a8 8 0 0 0 11.3 0l6-6a8 8 0 0 0-11.3-11.3l-2 2"/><path d="M28 20a8 8 0 0 0-11.3 0l-6 6a8 8 0 0 0 11.3 11.3l2-2"/>',
+  wifi: '<path d="M5 18a28 28 0 0 1 38 0M11 25a19 19 0 0 1 26 0M17.5 32a10 10 0 0 1 13 0"/><circle cx="24" cy="39" r="2" fill="currentColor"/>',
 };
+const glyph = (k) =>
+  `<svg class="s-glyph" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPH[k]}</svg>`;
 
-const CHECK = '<div class="check"><svg viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="44"/><path d="M30 49l12 12 24-26" fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
+const CHECK = '<svg class="s-check" viewBox="0 0 96 96" aria-hidden="true"><path d="M14 50l22 22 46-48"/></svg>';
+const WAITING = '<svg class="s-check wait" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="38"/></svg>';
 
 // ---------- rendering ----------
 
-function show(view, html) {
+function show(view, html, tone = '') {
   if (S.view === 'listening' && view !== 'listening') teardownListening();
   S.view = view;
-  app.innerHTML = `<div class="enter" style="display:contents">${html}</div>`;
+  document.body.dataset.tone = tone;
+  app.innerHTML = html;
+  app.firstElementChild?.classList.add('enter');
   app.dataset.view = view;
+  const meta = document.querySelector('meta[name="theme-color"]:not([media])') || document.createElement('meta');
+  meta.name = 'theme-color';
+  meta.content = getComputedStyle(document.body).backgroundColor;
+  document.head.append(meta);
   const h = app.querySelector('h1');
   if (h) {
     h.tabIndex = -1;
@@ -53,22 +64,19 @@ function show(view, html) {
   }
 }
 
-function iconStage(icon, tone = '') {
-  return `<div class="stage icon ${tone}" aria-hidden="true">${ICON[icon]}</div>`;
-}
-
 function who(extra = '') {
   if (!S.student) return '';
   return `<dl class="s-who"><dt>Name</dt><dd>${esc(S.student.name)}</dd><dt>Roll</dt><dd>${esc(S.student.roll)}</dd>${extra}</dl>`;
 }
 
+const page = (inner, actions = '') => `<div style="display:contents">${inner}<div class="s-actions">${actions}</div></div>`;
+
 const views = {
   noCourse() {
     show(
       'no_course',
-      `${iconStage('link')}
-      <div class="s-copy"><h1>This class link doesn't work</h1>
-      <p>Check the link with your lecturer. It should end with your course code, like <b>/c/CS201</b>.</p></div>`,
+      page(`<div class="s-copy">${glyph('link')}<h1 class="s-title">Bad link</h1>
+        <p>This class link doesn't match a class. Check it with your lecturer. It ends with the course code, like <b>/c/CS201</b>.</p></div>`),
     );
   },
 
@@ -76,23 +84,25 @@ const views = {
     const open = S.course.openRoster;
     show(
       'identify',
-      `<div class="s-copy"><h1>Who's checking in?</h1>
-       <p>Enter your roll number once. This phone remembers it for ${esc(S.course.code)}.</p></div>
-       <form class="s-form" id="who" novalidate>
-         <div class="field">
-           <label for="roll">Roll number</label>
-           <input class="input" id="roll" name="roll" autocomplete="off" autocapitalize="characters" spellcheck="false"
-             inputmode="text" required maxlength="32" value="${esc(S.roll || '')}" ${error ? 'aria-invalid="true" aria-describedby="err"' : ''} />
-         </div>
-         ${
-           open
-             ? `<div class="field"><label for="name">Your name</label>
-                <input class="input" id="name" name="name" autocomplete="name" maxlength="80" required /></div>`
-             : ''
-         }
-         ${error ? `<p class="form-error" id="err" role="alert">${esc(error)}</p>` : ''}
-         <div class="s-actions"><button class="btn btn-primary btn-lg btn-block" type="submit">Continue</button></div>
-       </form>`,
+      page(
+        `<div class="s-copy"><h1 class="s-title">Check in</h1>
+         <p>Your roll number, once. This phone remembers it for <b>${esc(S.course.code)}</b>.</p></div>
+         <form class="s-form" id="who" novalidate>
+           <div class="field">
+             <label for="roll">Roll number</label>
+             <input class="input" id="roll" name="roll" autocomplete="off" autocapitalize="characters" spellcheck="false"
+               required maxlength="32" placeholder="21CS001" value="${esc(S.roll || '')}" ${error ? 'aria-invalid="true" aria-describedby="err"' : ''} />
+           </div>
+           ${
+             open
+               ? `<div class="field"><label for="name">Your name</label>
+                  <input class="input" id="name" name="name" autocomplete="name" maxlength="80" required /></div>`
+               : ''
+           }
+           ${error ? `<p class="form-error" id="err" role="alert">${esc(error)}</p>` : ''}
+         </form>`,
+        '<button class="btn btn-primary btn-lg btn-block" type="submit" form="who">Continue</button>',
+      ),
     );
     $('#who').addEventListener('submit', onIdentify);
   },
@@ -100,10 +110,11 @@ const views = {
   noSession() {
     show(
       'no_session',
-      `${iconStage('wait')}
-       <div class="s-copy"><h1>Class hasn't started yet</h1>
-       <p>When your lecturer starts the session, this page moves on by itself.</p>${who()}</div>
-       <div class="s-actions"><p class="s-foot">Not you? <a href="#" data-act="switch">Use a different roll number</a></p></div>`,
+      page(
+        `<div class="s-copy">${glyph('wait')}<h1 class="s-title">Not started</h1>
+         <p>When your lecturer starts the session, this page moves on by itself.</p>${who()}</div>`,
+        '<p class="s-foot">Not you? <a href="#" data-act="switch">Use a different roll number</a></p>',
+      ),
     );
   },
 
@@ -114,31 +125,26 @@ const views = {
         : '';
     show(
       'ready',
-      `<div class="stage" aria-hidden="true">
-         <div class="stage-label"><span>Waiting to listen</span></div>
-         <canvas class="waterfall"></canvas>${slotsHtml()}
-       </div>
-       <div class="s-copy"><h1>Ready when you are</h1>
-       <p>Your phone listens for a quiet signal from the lecturer's laptop. It takes a few seconds.</p>${note}</div>
-       <div class="s-actions">
-         <button class="btn btn-primary btn-lg btn-block" data-act="listen">Start listening</button>
-         <p class="s-foot">Sound is decoded on this phone. Nothing is recorded or uploaded.</p>
-       </div>`,
+      page(
+        `<section class="s-viz" aria-hidden="true"><canvas class="waterfall"></canvas>${slotsHtml()}</section>
+         <div class="s-copy"><h1 class="s-title">Ready</h1>
+         <p>Your phone listens for a quiet signal from the lecturer's laptop. Hold it up for a few seconds.</p>${note}</div>`,
+        `<button class="btn btn-blue btn-lg btn-block" data-act="listen">Start listening</button>
+         <p class="s-foot">Sound is decoded on this phone. Nothing is recorded or uploaded.</p>`,
+      ),
     );
   },
 
   listening() {
     show(
       'listening',
-      `<div class="stage" id="stage" aria-hidden="true">
-         <div class="stage-label"><span id="stageLabel">Listening</span>
-           <span class="meter" id="meter"><b></b><b></b><b></b><b></b><b></b></span></div>
-         <canvas class="waterfall" id="wf"></canvas>${slotsHtml()}
-         ${CHECK}
-       </div>
-       <div class="s-copy"><h1 id="title">Listening</h1><p id="body">Hold your phone up with the screen facing you.</p>
-         <div id="extra"></div></div>
-       <div class="s-actions"><button class="btn btn-quiet btn-block" data-act="stop">Stop</button></div>`,
+      page(
+        `<section class="s-viz" id="stage" aria-hidden="true"><canvas class="waterfall" id="wf"></canvas>${slotsHtml()}</section>
+         <div class="s-sig"><span class="meter" id="meter"><b></b><b></b><b></b><b></b><b></b></span><span id="sigLabel">Listening</span></div>
+         <div class="s-copy" style="padding-top:4px"><h1 class="s-title" id="title">Listening</h1><p id="body">Hold your phone up with the screen facing you.</p>
+           <div id="extra"></div></div>`,
+        '<button class="btn btn-quiet btn-block" data-act="stop">Stop listening</button>',
+      ),
     );
   },
 
@@ -147,81 +153,66 @@ const views = {
     const already = status === 'already';
     show(
       status,
-      `<div class="stage done caught" aria-hidden="true">
-         <div class="stage-label"><span>${pending ? 'Waiting for your lecturer' : 'Code caught'}</span></div>
-         <canvas class="waterfall"></canvas>${slotsHtml()}${CHECK}
-       </div>
-       <div class="s-copy">
-         <h1 class="big">${pending ? 'Almost there' : 'Present'}</h1>
-         <p>${
-           pending
-             ? `You're checked in to ${esc(S.course.code)}. Your lecturer needs to confirm this phone.`
-             : already
-               ? `You already checked in to ${esc(S.course.code)} at ${time(at)}.`
-               : `Marked at ${time(at)} in ${esc(S.course.code)} ${esc(S.course.title)}.`
-         }</p>
-         ${who()}
-         ${pending ? '<p class="s-note">This phone is new for your roll number. Once your lecturer approves it, it becomes your phone for this class.</p>' : ''}
-       </div>
-       <div class="s-actions"><p class="s-foot">You can close this page.</p></div>`,
+      page(
+        `<div class="s-copy">${pending ? WAITING : CHECK}
+           <h1 class="s-title">${pending ? 'Almost there' : 'Present'}</h1>
+           <p>${
+             pending
+               ? `You're checked in to ${esc(S.course.code)}. This phone is new for your roll number, so your lecturer will confirm it.`
+               : already
+                 ? `You already checked in to ${esc(S.course.code)} at ${time(at)}.`
+                 : `Marked at ${time(at)} in ${esc(S.course.code)} ${esc(S.course.title)}.`
+           }</p>
+           ${who()}
+         </div>`,
+        '<p class="s-foot">You can close this page.</p>',
+      ),
+      pending ? 'hl' : 'blue',
     );
-    $('.stage').querySelectorAll('.slot').forEach((s, i) => {
-      s.classList.add('on');
-      s.style.setProperty('--v', String(((i * 7) % 16) / 15));
-    });
   },
 
   micProblem(kind) {
     const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const copy = {
       denied: {
-        h: 'Earshot needs your microphone',
-        p: 'Microphone access is blocked for this page. Turn it on, then try again.',
-        tips: isIOS
-          ? ['Tap <b>aA</b> in the address bar, then <b>Website Settings</b>.', 'Set <b>Microphone</b> to <b>Allow</b>.', 'Come back here and tap <b>Try again</b>.']
-          : ['Tap the icon at the left of the address bar.', 'Open <b>Permissions</b> and allow <b>Microphone</b>.', 'Come back here and tap <b>Try again</b>.'],
+        h: 'Mic blocked',
+        p: 'This page is not allowed to use the microphone. Turn it on, then try again.',
+        steps: isIOS
+          ? ['Tap <b>aA</b> in the address bar, then <b>Website Settings</b>.', 'Set <b>Microphone</b> to <b>Allow</b>.', 'Come back and tap <b>Try again</b>.']
+          : ['Tap the icon at the left of the address bar.', 'Open <b>Permissions</b> and allow <b>Microphone</b>.', 'Come back and tap <b>Try again</b>.'],
       },
-      insecure: {
-        h: 'Open the secure link',
-        p: 'Phones only share the microphone with pages that start with https. Ask your lecturer for that link.',
-        tips: [],
-      },
-      unsupported: {
-        h: "This browser can't listen",
-        p: 'Open this page in Chrome on Android or Safari on iPhone.',
-        tips: [],
-      },
-      no_device: { h: 'No microphone found', p: 'This device does not seem to have a microphone Earshot can use.', tips: [] },
-      busy: {
-        h: 'Your microphone is busy',
-        p: 'Another app is using it. Close calls, voice notes or recorders, then try again.',
-        tips: [],
-      },
-    }[kind] || { h: "Couldn't start the microphone", p: 'Try again. If it keeps failing, reload the page.', tips: [] };
+      insecure: { h: 'Wrong link', p: 'Phones only share the microphone with pages that start with https. Ask your lecturer for that link.', steps: [] },
+      unsupported: { h: "Can't listen here", p: 'This browser cannot use the microphone. Open the link in Chrome on Android or Safari on iPhone.', steps: [] },
+      no_device: { h: 'No mic', p: 'This device does not seem to have a microphone Earshot can use.', steps: [] },
+      busy: { h: 'Mic busy', p: 'Another app is using the microphone. Close calls, voice notes or recorders, then try again.', steps: [] },
+    }[kind] || { h: "Couldn't start", p: 'The microphone did not start. Try again, and reload the page if it keeps failing.', steps: [] };
     show(
       'mic_' + kind,
-      `${iconStage(kind === 'insecure' ? 'lock' : 'mic')}
-       <div class="s-copy"><h1>${copy.h}</h1><p>${copy.p}</p>
-       ${copy.tips.length ? `<ol class="s-tips">${copy.tips.map((t) => `<li>${t}</li>`).join('')}</ol>` : ''}</div>
-       <div class="s-actions">${kind === 'insecure' || kind === 'unsupported' ? '' : '<button class="btn btn-primary btn-lg btn-block" data-act="listen">Try again</button>'}</div>`,
+      page(
+        `<div class="s-copy">${glyph(kind === 'insecure' ? 'lock' : 'mic')}<h1 class="s-title">${copy.h}</h1><p>${copy.p}</p>
+         ${copy.steps.length ? `<ol class="s-steps">${copy.steps.map((t) => `<li><span>${t}</span></li>`).join('')}</ol>` : ''}</div>`,
+        kind === 'insecure' || kind === 'unsupported' ? '' : '<button class="btn btn-primary btn-lg btn-block" data-act="listen">Try again</button>',
+      ),
     );
   },
 
   ended() {
     show(
       'ended',
-      `${iconStage('closed')}
-       <div class="s-copy"><h1>Attendance for this class is closed</h1>
-       <p>Your lecturer ended the session before your phone checked in. If you were in the room, talk to them after class.</p>${who()}</div>`,
+      page(
+        `<div class="s-copy">${glyph('closed')}<h1 class="s-title">Closed</h1>
+         <p>Your lecturer ended the session before this phone checked in. If you were in the room, talk to them after class.</p>${who()}</div>`,
+      ),
     );
   },
 
   problem(title, body, { icon = 'phone', retry = false } = {}) {
     show(
       'problem',
-      `${iconStage(icon, 'hl')}
-       <div class="s-copy"><h1>${esc(title)}</h1><p>${esc(body)}</p></div>
-       <div class="s-actions">${retry ? '<button class="btn btn-primary btn-lg btn-block" data-act="listen">Listen again</button>' : ''}</div>`,
+      page(
+        `<div class="s-copy">${glyph(icon)}<h1 class="s-title">${esc(title)}</h1><p>${esc(body)}</p></div>`,
+        retry ? '<button class="btn btn-primary btn-lg btn-block" data-act="listen">Listen again</button>' : '',
+      ),
     );
   },
 };
@@ -247,13 +238,17 @@ window.__earshot = L.stats;
 function setText(title, body, label) {
   const t = $('#title');
   const b = $('#body');
-  if (t && t.textContent !== title) t.textContent = title;
+  if (t && t.textContent !== title) {
+    t.textContent = title;
+    if (!reduceMotion) t.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'ease-out' });
+  }
   if (b && b.innerHTML !== body) b.innerHTML = body;
-  if (label) $('#stageLabel').textContent = label;
+  if (label && $('#sigLabel')) $('#sigLabel').textContent = label;
 }
 
 function setPhase(phase) {
   if (L.submitting && phase !== 'sending') return;
+  if (phase === L.phase && phase !== 'locked') return;
   L.phase = phase;
   const extra = $('#extra');
   if (extra) extra.innerHTML = '';
@@ -262,24 +257,24 @@ function setPhase(phase) {
       setText('Listening', 'Hold your phone up with the screen facing you.', 'Listening');
       break;
     case 'faint':
-      setText('Picking something up', 'Hold the phone higher, away from your body, with nothing covering the bottom edge.', 'Faint signal');
+      setText('Faint', 'Something is there. Hold the phone higher, away from your body, with nothing covering the bottom edge.', 'Faint signal');
       break;
     case 'locked':
-      setText('Hearing the code', 'Keep the phone still for a moment.', 'Catching the code');
+      setText('Hearing it', 'Keep the phone still for a moment.', 'Catching the code');
       break;
     case 'close':
-      setText('Almost', 'Part of the code got lost in the noise. Keep holding the phone up. It tries again every couple of seconds.', 'Trying again');
+      setText('Almost', 'Part of the code got lost in the noise. Keep holding the phone up; it tries again every couple of seconds.', 'Trying again');
       break;
     case 'cant_hear':
-      setText("Can't hear the classroom yet", 'Still listening. A few things that help:', 'Nothing heard');
+      setText('Nothing yet', 'Still listening. Things that help:', 'Nothing heard');
       if (extra)
-        extra.innerHTML = `<ul class="s-tips">
-          <li>Check the lecturer's laptop shows the session screen with moving marks.</li>
-          <li>Move closer to the front, or hold the phone towards the laptop.</li>
-          <li>Ask your lecturer to switch to audible mode for a minute.</li></ul>`;
+        extra.innerHTML = `<ul class="s-steps plain">
+          <li><span>Check the lecturer's laptop is showing the session with a moving code.</span></li>
+          <li><span>Move closer to the front, or point the phone at the laptop.</span></li>
+          <li><span>Ask your lecturer to switch to audible mode for a minute.</span></li></ul>`;
       break;
     case 'sending':
-      setText('Got it', 'Checking you in…', 'Code caught');
+      setText('Caught', 'Checking you in…', 'Code caught');
       break;
   }
 }
@@ -299,6 +294,7 @@ async function startListening() {
   L.submitting = false;
   L.sent.clear();
   L.lostCount = 0;
+  L.phase = null;
   setPhase('silent');
 
   const band = () => S.session?.mode || 'quiet';
@@ -381,6 +377,31 @@ async function onSessionGone() {
   views.ended();
 }
 
+// The caught marks sit on one line; that line opens into the outcome colour.
+let floodEl = null;
+async function flood(tone) {
+  if (reduceMotion) return;
+  await wait(520);
+  const stage = $('#stage');
+  const r = stage?.getBoundingClientRect();
+  const y = r ? r.top + r.height / 2 : innerHeight / 2;
+  floodEl = document.createElement('div');
+  floodEl.className = 'flood';
+  floodEl.style.background = tone === 'hl' ? 'var(--hl)' : 'var(--blue)';
+  document.body.append(floodEl);
+  await floodEl.animate(
+    [{ clipPath: `inset(${y - 3}px 20px ${innerHeight - y - 3}px 20px)` }, { clipPath: `inset(${y - 3}px 0 ${innerHeight - y - 3}px 0)`, offset: 0.25 }, { clipPath: 'inset(0 0 0 0)' }],
+    { duration: 650, easing: 'cubic-bezier(0.7, 0, 0.2, 1)', fill: 'forwards' },
+  ).finished;
+}
+
+function unflood() {
+  if (!floodEl) return;
+  const el = floodEl;
+  floodEl = null;
+  el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' }).finished.then(() => el.remove());
+}
+
 async function submit(frame) {
   const payload = nibblesToHex(frame.nibbles);
   if (L.submitting || L.sent.has(payload)) return;
@@ -428,13 +449,12 @@ async function submit(frame) {
 
   if (res.ok) {
     S.student = data.student;
-    const stage = $('#stage');
-    stage?.classList.add('done');
     navigator.vibrate?.(30);
-    // Let the check draw before the screen changes.
-    await new Promise((r) => setTimeout(r, 900));
+    await flood(data.status === 'pending' ? 'hl' : 'blue');
     teardownListening();
-    return views.present(data.at, data.status === 'already' ? 'already' : data.status);
+    views.present(data.at, data.status === 'already' ? 'already' : data.status);
+    unflood();
+    return;
   }
 
   switch (data.error) {
@@ -473,7 +493,8 @@ async function onIdentify(e) {
   const name = nameInput?.value.trim();
   if (!roll) return views.identify('Enter your roll number.');
   if (nameInput && !name) return views.identify('Enter your name.');
-  form.querySelector('button').disabled = true;
+  const submitBtn = document.querySelector('button[form="who"]');
+  if (submitBtn) submitBtn.disabled = true;
   const n = nonce();
   const sig = await S.identity.sign(`earshot-enrol\n${code}\n${roll}\n${n}`);
   let res;

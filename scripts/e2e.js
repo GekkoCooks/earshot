@@ -115,6 +115,15 @@ try {
         shotTaken = true;
       }
     }
+    // Frames of the catch animation, for reviewing the motion.
+    if (shotDir && process.env.FRAMES && (await page.eval('!!document.querySelector(".s-viz.caught")'))) {
+      for (let k = 0; k < 6; k++) {
+        await page.screenshot(path.join(shotDir, `e2e-catch-${k}.png`));
+        await new Promise((r) => setTimeout(r, 160));
+      }
+      await new Promise((r) => setTimeout(r, 800));
+      view = await page.eval('document.querySelector("#app").dataset.view');
+    }
     if (view !== 'listening') break;
   }
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
