@@ -2,6 +2,12 @@
   "name": "earshot",
   "version": "0.1.0",
   "description": "Proof-of-presence attendance. Your phone has to hear the classroom to check in.",
+  "author": "Rithwik Chintapatla",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GekkoCooks/earshot.git"
+  },
+  "homepage": "https://github.com/GekkoCooks/earshot#readme",
   "type": "module",
   "private": true,
   "license": "MIT",

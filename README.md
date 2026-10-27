@@ -2,7 +2,7 @@
 
 Attendance that needs you in the room. The lecturer's laptop plays a short code as sound, mostly above what people notice. Students open a link and hold their phone up. If the phone hears the current code, they are marked present. If they are at home, there is nothing to hear.
 
-![The lecturer's live session: the code being played on the left, the register filling in on the right](docs/screenshots/lecturer-live.png)
+![The lecturer's live session: attendance count, the code being played and the join QR across the top, the register filling in below](docs/screenshots/lecturer-live.png)
 
 ## The problem
 
@@ -175,7 +175,7 @@ test/               node:test suites and the simulated room
 
 ## Known limitations
 
-- **Not yet tested on physical phones or in a real lecture hall.** Everything above is from unit tests, the simulated room, and real Chrome fed with recorded audio. The first real-room session should start with the field test page.
+- **Tested across two laptops, not yet on physical phones or in a real lecture hall.** Beyond a two-laptop check-in over the public tunnel, everything above is from unit tests, the simulated room, and real Chrome fed with recorded audio. The first real-room session should start with the field test page.
 - **Some people can hear 18 kHz,** especially younger listeners, as a faint high hiss. The default volume is moderate and audible mode exists for when the quiet band is a problem either way.
 - **Some phones and laptops filter high frequencies.** Cheap laptop speakers often fall off above 18 kHz, and a few Android microphones roll off above 16 kHz. Audible mode covers both.
 - **iOS may apply its own audio processing** whatever the page asks for. If that removes the quiet band on some iPhones, audible mode is the fallback.

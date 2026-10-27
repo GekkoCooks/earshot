@@ -6,7 +6,7 @@ import { qrMatrix, qrSvg } from '../public/js/lib/qr.js';
 // structural regressions.
 test('QR picks the smallest version that fits', () => {
   assert.equal(qrMatrix('x').length, 21);
-  assert.equal(qrMatrix('https://172.168.0.180:8443/c/CS201').length, 29);
+  assert.equal(qrMatrix('https://192.168.1.20:8443/c/CS201').length, 29);
   assert.throws(() => qrMatrix('x'.repeat(200)));
 });
 
