@@ -1,4 +1,4 @@
-# Earshot
+# Earshot[Alpha-Release]
 
 Attendance that needs you in the room. The lecturer's laptop plays a short code as sound, mostly above what people notice. Students open a link and hold their phone up. If the phone hears the current code, they are marked present. If they are at home, there is nothing to hear.
 
