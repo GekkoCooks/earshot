@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Earshot field test</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/student.css" />
+    <link rel="stylesheet" href="/css/lab.css" />
+    <script type="module" src="/js/lab.js"></script>
+  </head>
+  <body>
+    <div class="lab">
+      <header class="s-top">
+        <a class="wordmark" href="/">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="6" cy="12" r="2" fill="currentColor" stroke="none" />
+            <path d="M11 7.5a6 6 0 0 1 0 9" />
+            <path d="M15 4.5a10 10 0 0 1 0 15" />
+          </svg>
+          Earshot
+        </a>
+        <span class="s-course">Field test</span>
+      </header>
+
+      <div class="s-copy">
+        <h1>Check a room before class</h1>
+        <p>Play test codes from the laptop, then walk to the back row with a phone on this page in listen mode. Nothing here touches attendance.</p>
+      </div>
+
+      <div class="seg lab-seg" role="group" aria-label="Mode">
+        <button data-mode="listen" aria-pressed="true">Listen</button>
+        <button data-mode="play" aria-pressed="false">Play test codes</button>
+      </div>
+
+      <section id="listen" class="lab-pane">
+        <div class="stage">
+          <div class="stage-label"><span>Quiet band, 18 to 20 kHz</span><span class="num" id="lvQuiet">0 dB</span></div>
+          <canvas class="waterfall" id="wfQuiet"></canvas>
+        </div>
+        <div class="stage">
+          <div class="stage-label"><span>Audible band, 2.4 to 4.4 kHz</span><span class="num" id="lvAudible">0 dB</span></div>
+          <canvas class="waterfall" id="wfAudible"></canvas>
+        </div>
+        <dl class="lab-stats" id="stats"></dl>
+        <ol class="lab-log" id="log" aria-live="polite"></ol>
+        <div class="s-actions"><button class="btn btn-primary btn-lg btn-block" id="listenBtn">Start listening</button></div>
+      </section>
+
+      <section id="play" class="lab-pane" hidden>
+        <div class="seg" role="group" aria-label="Band">
+          <button data-band="quiet" aria-pressed="true">Quiet</button>
+          <button data-band="audible" aria-pressed="false">Audible</button>
+        </div>
+        <label class="volume"><span>Volume</span><input type="range" id="vol" min="0.05" max="1" step="0.05" value="0.8" /></label>
+        <p class="muted lab-note">Turn the laptop's own volume up as well. Test codes repeat every 1.6 seconds and change every 8.</p>
+        <div class="s-actions"><button class="btn btn-primary btn-lg btn-block" id="playBtn">Play test codes</button></div>
+      </section>
+    </div>
+  </body>
+</html>

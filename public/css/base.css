@@ -314,6 +314,43 @@ textarea.input {
   color: var(--blue);
 }
 
+/* ---------- segmented control and slider ---------- */
+
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--pencil) 10%, transparent);
+}
+.seg button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pencil);
+  font: 600 var(--t-sm) var(--font);
+  cursor: pointer;
+}
+.seg button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, #000 12%, transparent);
+}
+.volume {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  font-size: var(--t-sm);
+  color: var(--pencil);
+}
+input[type="range"] {
+  accent-color: var(--blue);
+  width: 100%;
+}
+
 dialog {
   border: 1px solid var(--line);
   border-radius: var(--r-lg);

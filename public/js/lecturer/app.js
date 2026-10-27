@@ -4,6 +4,7 @@
 import { Transmitter } from './transmitter.js';
 import { syncClock } from '../lib/clock.js';
 import { SYNC_SLOTS } from '../modem/protocol.js';
+import { qrSvg } from '../lib/qr.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
@@ -304,8 +305,15 @@ function renderLive() {
         </section>
         <section>
           <h2>Students open</h2>
-          <p class="join-url"><span class="host">${esc(host)}</span>/c/${esc(d.course.code)}</p>
-          <div class="join-actions"><button class="btn" data-act="copy" data-url="${esc(url)}">Copy link</button></div>
+          <div class="join">
+            <button class="qr" data-act="qr" data-url="${esc(url)}" aria-label="Show the QR code large">${qrSvg(url)}</button>
+            <div>
+              <p class="join-url"><span class="host">${esc(host)}</span>/c/${esc(d.course.code)}</p>
+              <div class="join-actions"><button class="btn" data-act="copy" data-url="${esc(url)}">Copy link</button>
+              <button class="btn btn-quiet" data-act="qr" data-url="${esc(url)}">Show large</button></div>
+            </div>
+          </div>
+          <p class="mode-note">Sharing this link is fine. It only opens the page; the phone still has to hear the room.</p>
         </section>
         <section>
           <h2>Phones listening now</h2>
@@ -611,6 +619,15 @@ document.addEventListener('click', async (e) => {
     } else if (act === 'copy') {
       await navigator.clipboard?.writeText(el.dataset.url);
       toast('Link copied');
+    } else if (act === 'qr') {
+      const dlg = document.createElement('dialog');
+      dlg.className = 'qr-big';
+      dlg.innerHTML = `<div class="qr-big-inner">${qrSvg(el.dataset.url)}<p class="join-url">${esc(el.dataset.url.replace(/^https?:\/\//, ''))}</p>
+        <button class="btn" data-close>Close</button></div>`;
+      document.body.append(dlg);
+      dlg.addEventListener('close', () => dlg.remove());
+      dlg.addEventListener('click', (ev) => (ev.target === dlg || ev.target.closest('[data-close]')) && dlg.close());
+      dlg.showModal();
     } else if (act === 'end') {
       confirmEnd();
     } else if (act === 'filter') {

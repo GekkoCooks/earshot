@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Earshot student states</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <style>
+      .gallery-head {
+        max-width: 72ch;
+        padding: 40px 32px 8px;
+      }
+      .gallery-head h1 {
+        font-size: var(--t-2xl);
+      }
+      .gallery-head p {
+        color: var(--pencil);
+        margin-top: 8px;
+      }
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 32px 24px;
+        padding: 24px 32px 64px;
+      }
+      .gallery figure {
+        margin: 0;
+        display: grid;
+        gap: 10px;
+      }
+      .gallery iframe {
+        width: 100%;
+        aspect-ratio: 390 / 760;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--paper);
+      }
+      .gallery figcaption {
+        font-size: var(--t-sm);
+      }
+      .gallery figcaption b {
+        display: block;
+      }
+      .gallery figcaption span {
+        color: var(--pencil);
+      }
+    </style>
+    <script type="module" src="/js/states.js"></script>
+  </head>
+  <body>
+    <header class="gallery-head">
+      <h1>Every state a student can see</h1>
+      <p>The check-in page is one screen that changes with the situation. Each one says what happened and what to do next. These are live renders of the real page with sample data.</p>
+    </header>
+    <main class="gallery" id="gallery"></main>
+  </body>
+</html>

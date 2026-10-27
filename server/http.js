@@ -108,7 +108,7 @@ export function serveFile(res, root, rel) {
 
 export const SECURITY_HEADERS = {
   'content-security-policy':
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; frame-ancestors 'self'; base-uri 'none'",
   'permissions-policy': 'microphone=(self), camera=(), geolocation=()',
   'referrer-policy': 'no-referrer',
   'x-content-type-options': 'nosniff',
