@@ -7,7 +7,16 @@ import { openDb } from './db.js';
 import { createApp } from './app.js';
 
 const db = openDb(config.dbFile);
-const app = createApp({ db, lecturerKey: config.lecturerKey, publicDir: config.publicDir });
+const hasCert = fs.existsSync(config.certFile) && fs.existsSync(config.keyFile);
+
+function joinBase() {
+  if (process.env.EARSHOT_PUBLIC_URL) return process.env.EARSHOT_PUBLIC_URL.replace(/\/$/, '');
+  const ip = lanAddresses()[0];
+  if (hasCert && ip) return `https://${ip}:${config.httpsPort}`;
+  return null;
+}
+
+const app = createApp({ db, lecturerKey: config.lecturerKey, publicDir: config.publicDir, joinBase });
 
 function lanAddresses() {
   const out = [];
@@ -18,7 +27,6 @@ function lanAddresses() {
 }
 
 http.createServer(app.handle).listen(config.httpPort, () => {
-  const hasCert = fs.existsSync(config.certFile) && fs.existsSync(config.keyFile);
   const lan = lanAddresses();
   const lines = ['', '  Earshot is running', ''];
   lines.push(`  Lecturer (this laptop)  http://localhost:${config.httpPort}/?key=${config.lecturerKey}`);

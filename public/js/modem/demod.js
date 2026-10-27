@@ -150,6 +150,15 @@ export class Demodulator {
     return out;
   }
 
+  /** The most recent hop for one band: 32 values in frequency order. */
+  spectrum(bandId) {
+    const b = this.bands.findIndex((x) => x.id === bandId);
+    const snr = this.get(this.nextHop - 1);
+    if (b < 0 || !snr) return null;
+    const per = TONES_PER_BANK * 2;
+    return snr.subarray(b * per, (b + 1) * per);
+  }
+
   get(hop) {
     if (hop < 0 || hop >= this.nextHop || hop < this.nextHop - HISTORY) return null;
     return this.hist[hop % HISTORY];

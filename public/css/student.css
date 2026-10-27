@@ -1,0 +1,308 @@
+/* Student check-in. One column, thumb-reachable action at the bottom. */
+
+.s-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+.s-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+}
+.s-course {
+  font-size: var(--t-sm);
+  color: var(--pencil);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.s-main {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 0;
+  padding-top: 8px;
+}
+
+.s-loading {
+  place-self: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--line);
+  border-top-color: var(--blue);
+  animation: spin 0.9s linear infinite;
+  grid-row: 1 / -1;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- the stage: what the phone hears ---------- */
+
+.stage {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 27px, color-mix(in srgb, var(--line) 70%, transparent) 27px 28px),
+    var(--surface);
+  overflow: hidden;
+  padding: 16px 16px 14px;
+}
+.stage-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--t-xs);
+  color: var(--pencil);
+  margin-bottom: 10px;
+  min-height: 1.5em;
+}
+.stage-label .meter {
+  display: inline-flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 12px;
+}
+.stage-label .meter b {
+  display: block;
+  width: 3px;
+  border-radius: 1px;
+  background: var(--line-strong);
+}
+.stage-label .meter b:nth-child(1) { height: 4px; }
+.stage-label .meter b:nth-child(2) { height: 6px; }
+.stage-label .meter b:nth-child(3) { height: 8px; }
+.stage-label .meter b:nth-child(4) { height: 10px; }
+.stage-label .meter b:nth-child(5) { height: 12px; }
+.stage-label .meter b.on {
+  background: var(--blue);
+}
+
+.waterfall {
+  display: block;
+  width: 100%;
+  height: 132px;
+  color: var(--blue);
+  border-radius: var(--r-sm);
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 4px;
+  margin-top: 12px;
+}
+.slot {
+  position: relative;
+  height: 52px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--pencil) 7%, transparent);
+}
+.slot i {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  height: 4px;
+  border-radius: 2px;
+  bottom: calc(6px + var(--v, 0.5) * (100% - 16px));
+  background: var(--blue);
+  opacity: 0;
+  transform: scaleX(0.3);
+  transition: opacity 0.18s, transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1), bottom 0.45s cubic-bezier(0.6, 0, 0.2, 1);
+}
+.slot.on i {
+  opacity: 1;
+  transform: scaleX(1);
+}
+.slot.weak i {
+  opacity: 0.45;
+}
+
+/* Caught: every mark slides to the same line, then the check is drawn. */
+.stage.caught .slot i {
+  opacity: 1;
+  transform: scaleX(1);
+  bottom: calc(50% - 2px);
+}
+.stage .check {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.stage .check svg {
+  width: 96px;
+  height: 96px;
+  opacity: 0;
+}
+.stage.done .check svg {
+  opacity: 1;
+}
+.stage.done .check circle {
+  fill: var(--blue);
+  transform-origin: center;
+  animation: pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+.stage.done .check path {
+  stroke: var(--on-blue);
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: draw 0.35s 0.2s ease-out forwards;
+}
+.stage.done .waterfall,
+.stage.done .slots {
+  opacity: 0.25;
+  transition: opacity 0.4s;
+}
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+  }
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* A calmer stage for states that are not about listening. */
+.stage.icon {
+  display: grid;
+  place-items: center;
+  min-height: 236px;
+}
+.stage.icon svg {
+  width: 72px;
+  height: 72px;
+  color: var(--pencil-soft);
+}
+.stage.icon.blue svg {
+  color: var(--blue);
+}
+.stage.icon.hl svg {
+  color: var(--on-hl);
+}
+.stage.icon.hl {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 27px, color-mix(in srgb, var(--hl) 25%, transparent) 27px 28px),
+    var(--hl-soft);
+  border-color: color-mix(in srgb, var(--hl) 50%, var(--line));
+}
+
+/* ---------- copy ---------- */
+
+.s-copy {
+  padding: 24px 4px 0;
+  display: grid;
+  gap: 8px;
+}
+.s-copy h1 {
+  font-size: var(--t-xl);
+}
+.s-copy p {
+  color: var(--pencil);
+  font-size: var(--t-md);
+}
+.s-copy .big {
+  font-family: var(--font-num);
+  font-size: var(--t-3xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--ink);
+}
+
+.s-who {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: var(--t-sm);
+}
+.s-who dt {
+  color: var(--pencil);
+}
+.s-who dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.s-tips {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  font-size: var(--t-sm);
+  color: var(--ink);
+}
+.s-tips li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 8px;
+}
+.s-tips li::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: 0.55em 0 0 6px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.s-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--hl-soft);
+  color: var(--on-hl);
+  font-size: var(--t-sm);
+}
+.s-note.plain {
+  background: color-mix(in srgb, var(--pencil) 9%, transparent);
+  color: var(--pencil);
+}
+
+.s-actions {
+  display: grid;
+  gap: 8px;
+  padding-top: 24px;
+  align-self: end;
+}
+.s-foot {
+  text-align: center;
+  font-size: var(--t-xs);
+  color: var(--pencil);
+  padding-top: 4px;
+}
+
+.s-form {
+  display: grid;
+  gap: 16px;
+  padding-top: 20px;
+}
+
+.s-main > .enter {
+  animation: enter 0.28s ease-out both;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

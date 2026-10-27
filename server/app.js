@@ -10,7 +10,7 @@ const MODES = new Set(['quiet', 'audible']);
 const ROLL_RE = /^[A-Za-z0-9][A-Za-z0-9\-_/.]{0,31}$/;
 const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9\-]{1,15}$/;
 
-export function createApp({ db, lecturerKey, publicDir, now = () => Date.now() }) {
+export function createApp({ db, lecturerKey, publicDir, now = () => Date.now(), joinBase = () => null }) {
   const hub = new Hub();
   const router = new Router();
   const limits = {
@@ -109,6 +109,13 @@ export function createApp({ db, lecturerKey, publicDir, now = () => Date.now() }
   });
 
   router.add('GET', '/api/me', (req, res) => sendJson(res, 200, { lecturer: isLecturer(req) }));
+
+  // Where phones should go. Falls back to however the lecturer reached us.
+  router.add('GET', '/api/info', (req, res) => {
+    requireLecturer(req);
+    const proto = req.socket.encrypted ? 'https' : 'http';
+    sendJson(res, 200, { joinBase: joinBase() || `${proto}://${req.headers.host}` });
+  });
 
   router.add('GET', '/api/courses', (req, res) => {
     requireLecturer(req);
