@@ -1,0 +1,20 @@
+{
+  "name": "earshot",
+  "version": "0.1.0",
+  "description": "Proof-of-presence attendance. Your phone has to hear the classroom to check in.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "cert": "node scripts/make-cert.js",
+    "seed": "node --disable-warning=ExperimentalWarning scripts/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "bench": "node scripts/modem-bench.js",
+    "e2e": "node --disable-warning=ExperimentalWarning scripts/e2e.js"
+  }
+}
